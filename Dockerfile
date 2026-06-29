@@ -2,10 +2,12 @@
 FROM node:22-slim AS build
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY package.json package-lock.json* ./
+# On ne copie QUE package.json (jamais le package-lock.json) pour forcer une
+# resolution propre sous Linux, quel que soit le lockfile present dans le repo.
+COPY package.json ./
 RUN npm install --no-audit --no-fund
 COPY . .
-RUN npx prisma generate && npm run build
+RUN rm -f package-lock.json; npx prisma generate && npm run build
 
 # ---- runner ----
 FROM node:22-slim AS runner
