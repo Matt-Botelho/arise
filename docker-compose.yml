@@ -1,0 +1,31 @@
+services:
+  app:
+    build: .
+    container_name: arise-app
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=file:/data/arise.db
+      - SYSTEM_CRON_SECRET=${SYSTEM_CRON_SECRET:-change-me}
+    volumes:
+      - arise-data:/data
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: arise-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  arise-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-mono: "Orbitron", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(59, 155, 255, 0.12), transparent 60%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(59, 155, 255, 0.03) 0px,
+      rgba(59, 155, 255, 0.03) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+}
+
+.system-glow {
+  text-shadow: 0 0 8px rgba(59, 155, 255, 0.6);
+}
+
+@keyframes systemIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.system-in { animation: systemIn 220ms ease-out both; }
