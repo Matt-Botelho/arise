@@ -30,6 +30,8 @@ model Hunter {
   rewards    Reward[]
   penalties  Penalty[]
   pushSubs   PushSub[]
+  dungeons   Dungeon[]
+  titles     Title[]
 }
 
 model Attribute {
@@ -107,4 +109,31 @@ model PushSub {
   endpoint  String   @unique
   keys      String
   createdAt DateTime @default(now())
+}
+
+model Dungeon {
+  id             String   @id @default(cuid())
+  hunterId       String
+  hunter         Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  title          String
+  description    String   @default("")
+  rank           String   @default("D")
+  stepsJson      String   @default("[]")
+  attributeCodes String   @default("[]")
+  rewardXp       Int      @default(300)
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+}
+
+model Title {
+  id          String   @id @default(cuid())
+  hunterId    String
+  hunter      Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  key         String
+  name        String
+  description String   @default("")
+  icon        String   @default("🏆")
+  unlockedAt  DateTime @default(now())
+
+  @@unique([hunterId, key])
 }
