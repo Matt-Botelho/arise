@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gameDay } from "@/lib/date";
 import { previousDay, penaltyFor, xpAfterPenalty } from "@/lib/game";
+import { sendPushToAll } from "@/lib/push";
 import type { PenaltyIntensity } from "@/lib/game.config";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ async function runTick() {
   if (!hunter) return { error: "Aucun chasseur" };
 
   const today = gameDay(new Date(), hunter.timezone, hunter.dayRolloverHour);
-  const target = previousDay(today); // le jour qui vient de se terminer
+  const target = previousDay(today);
 
   if (hunter.lastRollover && hunter.lastRollover >= target) {
     return { ok: true, message: "Deja traite", day: target };
@@ -77,6 +78,15 @@ async function runTick() {
     where: { id: hunter.id },
     data: { hp: finalHp, streak: newStreak, lastRollover: target },
   });
+
+  // Notification du Systeme (si push configure)
+  const summary =
+    failures > 0
+      ? "⚠ Zone de penalite : " + failures + " quete(s) obligatoire(s) ratee(s), -" + hpLost + " PV."
+      : mandatory.length > 0
+        ? "Journee validee, Chasseur. Serie : " + newStreak + " 🔥"
+        : "Une nouvelle journee commence.";
+  await sendPushToAll({ title: "Le Système", body: summary, url: "/" });
 
   return { ok: true, day: target, failures, hpLost, xpLost, streak: newStreak, hp: finalHp };
 }
