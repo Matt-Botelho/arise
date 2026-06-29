@@ -8,24 +8,12 @@ services:
       - SYSTEM_CRON_SECRET=${SYSTEM_CRON_SECRET:-change-me}
     volumes:
       - arise-data:/data
-    expose:
-      - "3000"
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: arise-caddy
-    restart: unless-stopped
-    depends_on:
-      - app
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy-data:/data
-      - caddy-config:/config
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.arise.rule=Host(`leveling.matthomelab.tech`)"
+      - "traefik.http.routers.arise.entrypoints=websecure"
+      - "traefik.http.routers.arise.tls.certresolver=letsencrypt"
+      - "traefik.http.services.arise.loadbalancer.server.port=3000"
 
 volumes:
   arise-data:
-  caddy-data:
-  caddy-config:
