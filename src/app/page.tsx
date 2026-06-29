@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import SystemPanel from "@/components/SystemPanel";
+import LpcAvatar from "@/components/LpcAvatar";
 import { xpForLevel } from "@/lib/game";
+import { DEFAULT_EQUIPPED, type Equipped } from "@/lib/lpc-items";
 
 type Attr = { id: string; code: string; name: string; icon: string; color: string; level: number; xp: number };
 type Penalty = { id: string; date: string; reason: string; hpLost: number; xpLost: number };
@@ -16,10 +19,12 @@ type Status = {
 
 export default function StatutPage() {
   const [data, setData] = useState<Status | null>(null);
+  const [equipped, setEquipped] = useState<Equipped | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/status").then((r) => r.json()).then((d) => (d.error ? setErr(d.error) : setData(d))).catch((e) => setErr(String(e)));
+    fetch("/api/character").then((r) => r.json()).then((d) => { if (!d.error) setEquipped(d.equipped || DEFAULT_EQUIPPED); }).catch(() => {});
   }, []);
 
   if (err) return <p className="text-red-400">{err}</p>;
@@ -30,33 +35,32 @@ export default function StatutPage() {
 
   return (
     <div className="space-y-4">
+      <SystemPanel title="[ Chasseur ]">
+        <div className="flex justify-center">
+          {equipped ? <LpcAvatar equipped={equipped} size={208} /> : <div className="h-52 animate-pulse text-system-accent">…</div>}
+        </div>
+        <div className="mt-2 text-center">
+          <Link href="/personnage" className="text-xs uppercase tracking-widest text-system-accent hover:underline">Personnaliser →</Link>
+        </div>
+      </SystemPanel>
+
       <SystemPanel title="[ Fenêtre de Statut ]">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-system-text/60">CHASSEUR</p>
             <h1 className="text-2xl font-bold system-glow">{h.name}</h1>
             <p className="text-sm text-system-text/70">« {h.title} »</p>
-            {h.exhausted && (
-              <span className="mt-1 inline-block rounded border border-red-500/60 px-2 py-0.5 text-[10px] uppercase tracking-widest text-red-400">
-                ⚠ Épuisé — gains d'XP réduits
-              </span>
-            )}
+            {h.exhausted && <span className="mt-1 inline-block rounded border border-red-500/60 px-2 py-0.5 text-[10px] uppercase tracking-widest text-red-400">⚠ Épuisé — gains d'XP réduits</span>}
           </div>
           <div className="text-center">
             <p className="text-xs text-system-text/60">RANG</p>
             <div className="text-5xl font-black text-system-accent system-glow">{h.rank}</div>
           </div>
         </div>
-
         <div className="mt-4">
-          <div className="flex justify-between text-[10px] uppercase tracking-widest text-system-text/50">
-            <span>PV</span><span>{h.hp}/{h.maxHp}</span>
-          </div>
-          <div className="mt-1 h-2 w-full overflow-hidden rounded bg-black/40">
-            <div className="h-full" style={{ width: hpPct + "%", backgroundColor: hpPct < 30 ? "#ff4d4d" : "#ff7a45" }} />
-          </div>
+          <div className="flex justify-between text-[10px] uppercase tracking-widest text-system-text/50"><span>PV</span><span>{h.hp}/{h.maxHp}</span></div>
+          <div className="mt-1 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: hpPct + "%", backgroundColor: hpPct < 30 ? "#ff4d4d" : "#ff7a45" }} /></div>
         </div>
-
         <div className="mt-4 grid grid-cols-3 gap-3 text-center text-sm">
           <Stat label="Série" value={"🔥 " + h.streak} />
           <Stat label="Énergie" value={h.mp + "/" + h.maxMp} />
@@ -71,9 +75,7 @@ export default function StatutPage() {
             <span>Rang {h.rank} → {data.promotion.nextRank}</span>
             <span className="text-system-text/60">niv. {data.promotion.required} requis partout</span>
           </div>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded bg-black/40">
-            <div className="h-full bg-system-accent" style={{ width: Math.round(data.promotion.progress * 100) + "%" }} />
-          </div>
+          <div className="mt-2 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full bg-system-accent" style={{ width: Math.round(data.promotion.progress * 100) + "%" }} /></div>
           {data.promotion.eligible
             ? <p className="mt-2 text-sm text-emerald-400 system-glow">✦ Épreuve de promotion débloquée — va dans l'onglet Quêtes !</p>
             : <p className="mt-2 text-xs text-system-text/60">À monter : {data.promotion.missing.map((m) => m.code).join(", ")}</p>}
@@ -103,14 +105,8 @@ export default function StatutPage() {
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border border-system-border/30 bg-black/30 py-2">
-      <div className="text-system-accent">{value}</div>
-      <div className="text-[10px] uppercase tracking-widest text-system-text/50">{label}</div>
-    </div>
-  );
+  return <div className="rounded border border-system-border/30 bg-black/30 py-2"><div className="text-system-accent">{value}</div><div className="text-[10px] uppercase tracking-widest text-system-text/50">{label}</div></div>;
 }
-
 function AttributeRow({ a }: { a: Attr }) {
   const need = xpForLevel(a.level);
   const pct = need > 0 ? Math.min(100, Math.round((a.xp / need) * 100)) : 0;
@@ -120,9 +116,7 @@ function AttributeRow({ a }: { a: Attr }) {
         <span className="flex items-center gap-2"><span>{a.icon}</span><span className="text-sm">{a.name}</span></span>
         <span className="text-sm" style={{ color: a.color }}>Niv. {a.level}</span>
       </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-black/40">
-        <div className="h-full" style={{ width: pct + "%", backgroundColor: a.color }} />
-      </div>
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: pct + "%", backgroundColor: a.color }} /></div>
       <div className="mt-1 text-right text-[10px] text-system-text/50">{a.xp}/{need} XP</div>
     </div>
   );
