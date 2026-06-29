@@ -1,30 +1,29 @@
-# Crédits des assets (LPC)
+# Crédits assets (LPC)
 
-Assets issus du Liberated Pixel Cup / Universal-LPC-Spritesheet-Character-Generator.
-Licences : OGA-BY 3.0 / CC-BY-SA 3.0 / GPL 3.0.
+Liberated Pixel Cup / Universal-LPC-Spritesheet-Character-Generator.
+Licences: OGA-BY 3.0 / CC-BY-SA 3.0 / GPL 3.0.
 
 ## Auteurs
-- Benjamin K. Smith (BenCreating)
-- Durrani
-- Eliza Wyatt (ElizaWy)
+- Barbara Riviera
+- Bluecarrot16
 - ElizaWy
 - Evert
+- Fabzy
 - JaidynReiman
 - Joe White
 - Johannes Sjölund (wulax)
+- Mandi Paugh
 - Manuel Riecke (MrBeast)
 - Matthew Krohn (makrohn)
-- Michael Whitlock (bigbeargames)
-- MuffinElZangano
 - Napsio (Vitruvian Studio)
 - Nila122
-- Pierre Vigier (pvigier)
-- Sander Frenken (castelonia)
 - Stephen Challener (Redshrike)
-- TheraHedwig
+- Thane Brimhall (pennomi)
+- William.Thompsonj
+- Yamilian
 - bluecarrot16
 - dalonedrau
-- kcilds/Rocetti/Eredah
-- kheftel
+- laetissima
+- thecilekli
 
-Source : https://github.com/liberatedpixelcup/Universal-LPC-Spritesheet-Character-Generator
+https://github.com/liberatedpixelcup/Universal-LPC-Spritesheet-Character-Generator
