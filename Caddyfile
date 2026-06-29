@@ -1,7 +1,7 @@
 # Remplace le domaine ci-dessous si tu changes de sous-domaine.
 # Caddy obtient et renouvelle le certificat HTTPS automatiquement (Let's Encrypt)
 # des que l'enregistrement DNS A de ce sous-domaine pointe vers l'IP du VPS.
-systeme.matthomelab.tech {
+leveling.matthomelab.tech {
     reverse_proxy arise-app:3000
     encode gzip
 }
