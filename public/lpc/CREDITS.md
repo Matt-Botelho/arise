@@ -1,4 +1,4 @@
-# Crédits assets (LPC)
+# Credits assets (LPC)
 
 Liberated Pixel Cup / Universal-LPC-Spritesheet-Character-Generator.
 Licences: OGA-BY 3.0 / CC-BY-SA 3.0 / GPL 3.0.

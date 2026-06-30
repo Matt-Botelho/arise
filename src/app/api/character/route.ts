@@ -5,7 +5,7 @@ import { rankIndex } from "@/lib/game";
 import type { Rank } from "@/lib/game.config";
 
 export const dynamic = "force-dynamic";
-const INV_VERSION = 3; // bascule vers le modèle loot : on offre les communs, le reste se loote
+const INV_VERSION = 4;
 
 export async function GET() {
   const hunter = await prisma.hunter.findFirst();
@@ -25,9 +25,7 @@ export async function GET() {
     appearance.invVersion = INV_VERSION;
     changed = true;
   }
-  if (changed) {
-    await prisma.hunter.update({ where: { id: hunter.id }, data: { appearanceJson: JSON.stringify(appearance), equippedJson: JSON.stringify(equipped) } });
-  }
+  if (changed) await prisma.hunter.update({ where: { id: hunter.id }, data: { appearanceJson: JSON.stringify(appearance), equippedJson: JSON.stringify(equipped) } });
 
   const owned = (await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id } })).map((i) => i.itemKey);
   return NextResponse.json({ appearance, equipped, owned, rankIndex: rankIndex(hunter.rank as Rank), catalog: ITEMS });
