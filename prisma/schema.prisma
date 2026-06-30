@@ -1,39 +1,152 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "sqlite"; url = env("DATABASE_URL") }
-model Hunter {
-  id String @id @default(cuid())
-  name String @default("Chasseur")
-  rank String @default("F")
-  hp Int @default(100)
-  maxHp Int @default(100)
-  mp Int @default(50)
-  maxMp Int @default(50)
-  gold Int @default(0)
-  title String @default("Le Faible")
-  streak Int @default(0)
-  penaltyIntensity String @default("fidele")
-  dayRolloverHour Int @default(0)
-  timezone String @default("Europe/Paris")
-  lastRollover String?
-  appearanceJson String?
-  equippedJson String?
-  createdAt DateTime @default(now())
-  attributes Attribute[]
-  quests Quest[]
-  questLogs QuestLog[]
-  rewards Reward[]
-  penalties Penalty[]
-  pushSubs PushSub[]
-  dungeons Dungeon[]
-  titles Title[]
-  inventory InventoryItem[]
+generator client {
+  provider = "prisma-client-js"
 }
-model Attribute { id String @id @default(cuid()) hunterId String hunter Hunter @relation(fields:[hunterId],references:[id],onDelete:Cascade) code String name String icon String @default("⭐") color String @default("#3b9bff") level Int @default(1) xp Int @default(0) order Int @default(0) @@unique([hunterId,code]) }
-model Quest { id String @id @default(cuid()) hunterId String hunter Hunter @relation(fields:[hunterId],references:[id],onDelete:Cascade) title String description String @default("") type String @default("daily") recurrence String @default("daily") attributeCodes String @default("[]") baseXp Int @default(50) difficulty String @default("E") isMandatory Boolean @default(false) targetRank String? active Boolean @default(true) createdAt DateTime @default(now()) logs QuestLog[] }
-model QuestLog { id String @id @default(cuid()) questId String quest Quest @relation(fields:[questId],references:[id],onDelete:Cascade) hunterId String hunter Hunter @relation(fields:[hunterId],references:[id],onDelete:Cascade) date String status String @default("done") xpAwarded Int @default(0) createdAt DateTime @default(now()) @@unique([questId,date]) }
-model Reward { id String @id @default(cuid()) hunterId String hunter Hunter @relation(fields:[hunterId],references:[id],onDelete:Cascade) title String cost Int @default(100) redeemedAt DateTime? }
-model Penalty { id String @id @default(cuid()) hunterId String hunter Hunter @relation(fields:[hunterId],references:[id],onDelete:Cascade) date String reason String @default("") hpLost Int @default(0) xpLost Int @default(0) createdAt DateTime @default(now()) }
-model PushSub { id String @id @default(cuid()) hunterId String hunter Hunter @relation(fields:[hunterId],references:[id],onDelete:Cascade) endpoint String @unique keys String createdAt DateTime @default(now()) }
-model Dungeon { id String @id @default(cuid()) hunterId String hunter Hunter @relation(fields:[hunterId],references:[id],onDelete:Cascade) title String description String @default("") rank String @default("D") stepsJson String @default("[]") attributeCodes String @default("[]") rewardXp Int @default(300) status String @default("active") createdAt DateTime @default(now()) }
-model Title { id String @id @default(cuid()) hunterId String hunter Hunter @relation(fields:[hunterId],references:[id],onDelete:Cascade) key String name String description String @default("") icon String @default("🏆") unlockedAt DateTime @default(now()) @@unique([hunterId,key]) }
-model InventoryItem { id String @id @default(cuid()) hunterId String hunter Hunter @relation(fields:[hunterId],references:[id],onDelete:Cascade) itemKey String acquiredAt DateTime @default(now()) @@unique([hunterId,itemKey]) }
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Hunter {
+  id               String   @id @default(cuid())
+  name             String   @default("Chasseur")
+  rank             String   @default("F")
+  hp               Int      @default(100)
+  maxHp            Int      @default(100)
+  mp               Int      @default(50)
+  maxMp            Int      @default(50)
+  gold             Int      @default(0)
+  title            String   @default("Le Faible")
+  streak           Int      @default(0)
+  penaltyIntensity String   @default("fidele")
+  dayRolloverHour  Int      @default(0)
+  timezone         String   @default("Europe/Paris")
+  lastRollover     String?
+  appearanceJson   String?
+  equippedJson     String?
+  createdAt        DateTime @default(now())
+
+  attributes Attribute[]
+  quests     Quest[]
+  questLogs  QuestLog[]
+  rewards    Reward[]
+  penalties  Penalty[]
+  pushSubs   PushSub[]
+  dungeons   Dungeon[]
+  titles     Title[]
+  inventory  InventoryItem[]
+}
+
+model Attribute {
+  id       String @id @default(cuid())
+  hunterId String
+  hunter   Hunter @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  code     String
+  name     String
+  icon     String @default("⭐")
+  color    String @default("#3b9bff")
+  level    Int    @default(1)
+  xp       Int    @default(0)
+  order    Int    @default(0)
+
+  @@unique([hunterId, code])
+}
+
+model Quest {
+  id             String   @id @default(cuid())
+  hunterId       String
+  hunter         Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  title          String
+  description    String   @default("")
+  type           String   @default("daily")
+  recurrence     String   @default("daily")
+  attributeCodes String   @default("[]")
+  baseXp         Int      @default(50)
+  difficulty     String   @default("E")
+  isMandatory    Boolean  @default(false)
+  targetRank     String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  logs QuestLog[]
+}
+
+model QuestLog {
+  id        String   @id @default(cuid())
+  questId   String
+  quest     Quest    @relation(fields: [questId], references: [id], onDelete: Cascade)
+  hunterId  String
+  hunter    Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  date      String
+  status    String   @default("done")
+  xpAwarded Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([questId, date])
+}
+
+model Reward {
+  id         String    @id @default(cuid())
+  hunterId   String
+  hunter     Hunter    @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  title      String
+  cost       Int       @default(100)
+  redeemedAt DateTime?
+}
+
+model Penalty {
+  id        String   @id @default(cuid())
+  hunterId  String
+  hunter    Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  date      String
+  reason    String   @default("")
+  hpLost    Int      @default(0)
+  xpLost    Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model PushSub {
+  id        String   @id @default(cuid())
+  hunterId  String
+  hunter    Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  keys      String
+  createdAt DateTime @default(now())
+}
+
+model Dungeon {
+  id             String   @id @default(cuid())
+  hunterId       String
+  hunter         Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  title          String
+  description    String   @default("")
+  rank           String   @default("D")
+  stepsJson      String   @default("[]")
+  attributeCodes String   @default("[]")
+  rewardXp       Int      @default(300)
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+}
+
+model Title {
+  id          String   @id @default(cuid())
+  hunterId    String
+  hunter      Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  key         String
+  name        String
+  description String   @default("")
+  icon        String   @default("🏆")
+  unlockedAt  DateTime @default(now())
+
+  @@unique([hunterId, key])
+}
+
+model InventoryItem {
+  id         String   @id @default(cuid())
+  hunterId   String
+  hunter     Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  itemKey    String
+  acquiredAt DateTime @default(now())
+
+  @@unique([hunterId, itemKey])
+}
