@@ -3,22 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { applyXp, checkPromotion, isExhausted } from "@/lib/game";
 import { DIFFICULTY_MULT, type Rank } from "@/lib/game.config";
 import { gameDay } from "@/lib/date";
+import { rollLoot } from "@/lib/loot";
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { questId?: string };
   const questId = body.questId;
   if (!questId) return NextResponse.json({ error: "questId manquant" }, { status: 400 });
-
   const quest = await prisma.quest.findUnique({ where: { id: questId } });
   if (!quest) return NextResponse.json({ error: "Quête introuvable" }, { status: 404 });
-
-  const hunter = await prisma.hunter.findUnique({
-    where: { id: quest.hunterId }, include: { attributes: true },
-  });
+  const hunter = await prisma.hunter.findUnique({ where: { id: quest.hunterId }, include: { attributes: true } });
   if (!hunter) return NextResponse.json({ error: "Chasseur introuvable" }, { status: 404 });
 
   const day = gameDay(new Date(), hunter.timezone, hunter.dayRolloverHour);
-
   const already = await prisma.questLog.findUnique({ where: { questId_date: { questId, date: day } } });
   if (already) return NextResponse.json({ error: "Déjà complétée aujourd'hui" }, { status: 409 });
 
@@ -26,10 +22,8 @@ export async function POST(req: Request) {
   const exhausted = isExhausted(hunter.hp);
   const gained = Math.round(quest.baseXp * mult * (exhausted ? 0.5 : 1));
   const codes: string[] = JSON.parse(quest.attributeCodes || "[]");
-
   const levelUps: { code: string; name: string; level: number }[] = [];
   const per = codes.length > 0 ? Math.round(gained / codes.length) : 0;
-
   for (const code of codes) {
     const attr = hunter.attributes.find((a) => a.code === code);
     if (!attr) continue;
@@ -38,17 +32,9 @@ export async function POST(req: Request) {
     attr.level = res.level; attr.xp = res.xp;
     if (res.leveledUp) levelUps.push({ code: attr.code, name: attr.name, level: res.level });
   }
-
-  await prisma.questLog.create({
-    data: { questId, hunterId: hunter.id, date: day, status: "done", xpAwarded: gained },
-  });
-
-  // Or + petite regen de PV (sort doucement de l'etat Epuise).
+  await prisma.questLog.create({ data: { questId, hunterId: hunter.id, date: day, status: "done", xpAwarded: gained } });
   const newHp = Math.min(hunter.maxHp, hunter.hp + 2);
-  await prisma.hunter.update({
-    where: { id: hunter.id },
-    data: { gold: hunter.gold + Math.round(gained / 5), hp: newHp },
-  });
+  await prisma.hunter.update({ where: { id: hunter.id }, data: { gold: hunter.gold + Math.round(gained / 5), hp: newHp } });
 
   let promoted: { from: string; to: string } | null = null;
   if (quest.type === "rankup" && quest.targetRank) {
@@ -58,10 +44,17 @@ export async function POST(req: Request) {
     hunter.rank = quest.targetRank;
   }
 
-  const promotion = checkPromotion(
-    hunter.rank as Rank,
-    hunter.attributes.map((a) => ({ code: a.code, level: a.level }))
-  );
+  // Loot : chance de drop d'une pièce non-commune non possédée
+  let drop: { key: string; name: string; rarity: string } | null = null;
+  if (quest.type !== "rankup") {
+    const owned = (await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id } })).map((i) => i.itemKey);
+    const it = rollLoot(owned, quest.difficulty);
+    if (it) {
+      await prisma.inventoryItem.create({ data: { hunterId: hunter.id, itemKey: it.key } }).catch(() => {});
+      drop = { key: it.key, name: it.name, rarity: it.rarity };
+    }
+  }
 
-  return NextResponse.json({ ok: true, gained, exhausted, levelUps, promoted, promotion });
+  const promotion = checkPromotion(hunter.rank as Rank, hunter.attributes.map((a) => ({ code: a.code, level: a.level })));
+  return NextResponse.json({ ok: true, gained, exhausted, levelUps, promoted, promotion, drop });
 }
