@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ACHIEVEMENTS, evaluateAchievements, type AchCtx } from "@/lib/achievements";
-import { totalPower, rankIndex } from "@/lib/game";
-import type { Rank } from "@/lib/game.config";
+import { totalPower } from "@/lib/game";
+import { rankIndex } from "@/lib/progression";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export async function GET() {
   const dungeonsCleared = await prisma.dungeon.count({ where: { hunterId: hunter.id, status: "cleared" } });
   const levels = hunter.attributes.map((a) => a.level);
   const ctx: AchCtx = {
-    rankIndex: rankIndex(hunter.rank as Rank),
+    rankIndex: rankIndex(hunter.rank),
     maxAttrLevel: levels.length ? Math.max(...levels) : 0,
     minAttrLevel: levels.length ? Math.min(...levels) : 0,
     totalPower: totalPower(hunter.attributes),

@@ -18,6 +18,8 @@ model Hunter {
   gold             Int      @default(0)
   title            String   @default("Le Faible")
   streak           Int      @default(0)
+  globalLevel      Int      @default(1)
+  globalXp         Int      @default(0)
   penaltyIntensity String   @default("fidele")
   dayRolloverHour  Int      @default(0)
   timezone         String   @default("Europe/Paris")
@@ -125,6 +127,8 @@ model Dungeon {
   attributeCodes String   @default("[]")
   rewardXp       Int      @default(300)
   status         String   @default("active")
+  isRankUp       Boolean  @default(false)
+  targetRank     String?
   createdAt      DateTime @default(now())
 }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { applyXp } from "@/lib/game";
+import { applyAttrXp } from "@/lib/progression";
 import { dungeonProgress, type DungeonStep } from "@/lib/achievements";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
   const wasCleared = dungeon.status === "cleared";
   const levelUps: { code: string; name: string; level: number }[] = [];
   let newStatus = dungeon.status;
+  let rankedUp: { from: string; to: string } | null = null;
 
   if (prog.cleared && !wasCleared) {
     newStatus = "cleared";
@@ -31,15 +32,21 @@ export async function POST(req: Request) {
     for (const code of codes) {
       const attr = hunter.attributes.find((a) => a.code === code);
       if (!attr) continue;
-      const res = applyXp(attr.level, attr.xp, per);
+      const res = applyAttrXp(attr.level, attr.xp, per, hunter.globalLevel);
       await prisma.attribute.update({ where: { id: attr.id }, data: { level: res.level, xp: res.xp } });
       if (res.leveledUp) levelUps.push({ code: attr.code, name: attr.name, level: res.level });
     }
-    await prisma.hunter.update({ where: { id: hunter.id }, data: { gold: hunter.gold + Math.round(dungeon.rewardXp / 5) } });
+    const goldBonus = Math.round(dungeon.rewardXp / 5);
+    if (dungeon.isRankUp && dungeon.targetRank) {
+      rankedUp = { from: hunter.rank, to: dungeon.targetRank };
+      await prisma.hunter.update({ where: { id: hunter.id }, data: { rank: dungeon.targetRank, gold: hunter.gold + goldBonus } });
+    } else {
+      await prisma.hunter.update({ where: { id: hunter.id }, data: { gold: hunter.gold + goldBonus } });
+    }
   } else if (!prog.cleared && wasCleared) {
     newStatus = "active";
   }
 
   await prisma.dungeon.update({ where: { id: dungeon.id }, data: { stepsJson: JSON.stringify(steps), status: newStatus } });
-  return NextResponse.json({ ok: true, cleared: prog.cleared && !wasCleared, levelUps });
+  return NextResponse.json({ ok: true, cleared: prog.cleared && !wasCleared, levelUps, rankedUp });
 }
