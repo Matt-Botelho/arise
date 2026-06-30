@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { applyAttrXp } from "@/lib/progression";
+import { applyAttrXp, rankCeiling } from "@/lib/progression";
 import { dungeonProgress, type DungeonStep } from "@/lib/achievements";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,11 @@ export async function POST(req: Request) {
   if (!dungeon) return NextResponse.json({ error: "Donjon introuvable" }, { status: 404 });
   const hunter = await prisma.hunter.findUnique({ where: { id: dungeon.hunterId }, include: { attributes: true } });
   if (!hunter) return NextResponse.json({ error: "Chasseur introuvable" }, { status: 404 });
+
+  // Verrou : un donjon de passage de rang ne se valide qu'au niveau max du rang
+  if (dungeon.isRankUp && hunter.globalLevel < rankCeiling(hunter.rank)) {
+    return NextResponse.json({ error: "Donjon verrouillé : atteins le niveau " + rankCeiling(hunter.rank) + " (max du rang " + hunter.rank + ") pour l'affronter." }, { status: 423 });
+  }
 
   const steps: DungeonStep[] = JSON.parse(dungeon.stepsJson || "[]");
   if (b.index < 0 || b.index >= steps.length) return NextResponse.json({ error: "Étape invalide" }, { status: 400 });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { nextRank } from "@/lib/progression";
 
 export const dynamic = "force-dynamic";
 
@@ -20,21 +21,34 @@ export async function POST(req: Request) {
   const hunter = await prisma.hunter.findFirst();
   if (!hunter) return NextResponse.json({ error: "Aucun chasseur" }, { status: 404 });
   const b = (await req.json().catch(() => ({}))) as {
-    title?: string; description?: string; rank?: string; steps?: string[]; rewardXp?: number; attributeCodes?: string[];
+    title?: string; description?: string; rank?: string; steps?: string[]; rewardXp?: number; attributeCodes?: string[]; isRankUp?: boolean;
   };
   if (!b.title || !b.title.trim()) return NextResponse.json({ error: "Titre requis" }, { status: 400 });
   const steps = (Array.isArray(b.steps) ? b.steps : [])
     .filter((x) => typeof x === "string" && x.trim())
     .map((label) => ({ label: label.trim(), done: false }));
+
+  let isRankUp = !!b.isRankUp;
+  let targetRank: string | null = null;
+  let rankField = b.rank && b.rank.trim() ? b.rank.trim() : "D";
+  if (isRankUp) {
+    const tr = nextRank(hunter.rank);
+    if (!tr) return NextResponse.json({ error: "Tu es déjà au rang maximal." }, { status: 400 });
+    targetRank = tr;
+    rankField = hunter.rank;
+  }
+
   const dungeon = await prisma.dungeon.create({
     data: {
       hunterId: hunter.id,
       title: b.title.trim(),
       description: typeof b.description === "string" ? b.description : "",
-      rank: ["E", "D", "C", "B", "A", "S"].includes(b.rank || "") ? (b.rank as string) : "D",
+      rank: rankField,
       stepsJson: JSON.stringify(steps),
       attributeCodes: JSON.stringify(Array.isArray(b.attributeCodes) ? b.attributeCodes : []),
       rewardXp: Number.isInteger(b.rewardXp) && (b.rewardXp as number) > 0 ? (b.rewardXp as number) : 300,
+      isRankUp,
+      targetRank,
     },
   });
   return NextResponse.json({ ok: true, dungeon });
