@@ -11,7 +11,7 @@ type Status = {
   hunter: {
     name: string; rank: string; globalLevel: number; globalXp: number; globalXpNext: number;
     ceiling: number; nextRank: string | null; rankUpAvailable: boolean;
-    hp: number; maxHp: number; mp: number; maxMp: number; gold: number; title: string; streak: number; exhausted: boolean;
+    hp: number; maxHp: number; mp: number; maxMp: number; gold: number; title: string; streak: number; exhausted: boolean; onboarded: boolean;
   };
   attributes: Attr[]; power: number; penalties: Penalty[];
 };
@@ -33,7 +33,13 @@ export default function StatutPage() {
   const rankPct = Math.max(0, Math.min(100, Math.round(((h.globalLevel - floor) / 10) * 100)));
 
   return (
-    <div className="md:grid md:grid-cols-[300px_1fr] md:items-start md:gap-4">
+    <div>
+      {!h.onboarded && (
+        <a href="/onboarding" className="mb-4 block rounded-md border border-amber-400/60 bg-amber-400/10 p-3 text-center text-sm text-amber-200 system-glow">
+          ✦ Bienvenue Chasseur — lance ton onboarding pour définir tes objectifs et tes quêtes →
+        </a>
+      )}
+      <div className="md:grid md:grid-cols-[300px_1fr] md:items-start md:gap-4">
       <div className="mb-4 md:mb-0 md:sticky md:top-4">
         <SystemPanel title="[ Chasseur ]">
           <div className="flex flex-col items-center">
@@ -100,6 +106,7 @@ export default function StatutPage() {
             </ul>
           </SystemPanel>
         )}
+      </div>
       </div>
     </div>
   );

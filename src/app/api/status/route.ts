@@ -34,7 +34,7 @@ export async function GET() {
       globalLevel: hunter.globalLevel, globalXp: hunter.globalXp, globalXpNext: globalXpForLevel(hunter.globalLevel),
       ceiling, nextRank: target, rankUpAvailable: canRankUp,
       hp: hunter.hp, maxHp: hunter.maxHp, mp: hunter.mp, maxMp: hunter.maxMp,
-      gold: hunter.gold, title: hunter.title, streak: hunter.streak, exhausted: isExhausted(hunter.hp),
+      gold: hunter.gold, title: hunter.title, streak: hunter.streak, exhausted: isExhausted(hunter.hp), onboarded: hunter.onboarded,
     },
     attributes: hunter.attributes.map((a) => ({ ...a, xpNext: xpForLevel(a.level), capped: a.level >= hunter.globalLevel })),
     power: totalPower(hunter.attributes),

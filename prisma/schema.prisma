@@ -38,6 +38,8 @@ model Hunter {
   titles     Title[]
   inventory  InventoryItem[]
   weeklies   Weekly[]
+  objectives Objective[]
+  onboarded  Boolean  @default(false)
 }
 
 model Attribute {
@@ -68,6 +70,7 @@ model Quest {
   difficulty     String   @default("E")
   isMandatory    Boolean  @default(false)
   targetRank     String?
+  objectiveId    String?
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
 
@@ -168,4 +171,16 @@ model Weekly {
   status         String   @default("active")
   weekKey        String   @default("")
   createdAt      DateTime @default(now())
+}
+
+model Objective {
+  id            String   @id @default(cuid())
+  hunterId      String
+  hunter        Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  attributeCode String
+  horizon       String   @default("court")
+  title         String
+  description   String   @default("")
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
 }
