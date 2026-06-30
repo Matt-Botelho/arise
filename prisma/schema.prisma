@@ -37,6 +37,7 @@ model Hunter {
   dungeons   Dungeon[]
   titles     Title[]
   inventory  InventoryItem[]
+  weeklies   Weekly[]
 }
 
 model Attribute {
@@ -153,4 +154,18 @@ model InventoryItem {
   acquiredAt DateTime @default(now())
 
   @@unique([hunterId, itemKey])
+}
+
+model Weekly {
+  id             String   @id @default(cuid())
+  hunterId       String
+  hunter         Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  title          String
+  description    String   @default("")
+  attributeCodes String   @default("[]")
+  stepsJson      String   @default("[]")
+  baseXp         Int      @default(400)
+  status         String   @default("active")
+  weekKey        String   @default("")
+  createdAt      DateTime @default(now())
 }
