@@ -16,6 +16,7 @@ model Hunter {
   mp               Int      @default(50)
   maxMp            Int      @default(50)
   gold             Int      @default(0)
+  shards           Int      @default(0)
   title            String   @default("Le Faible")
   streak           Int      @default(0)
   globalLevel      Int      @default(1)
@@ -71,6 +72,7 @@ model Quest {
   isMandatory    Boolean  @default(false)
   targetRank     String?
   objectiveId    String?
+  themedDay      String?
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
 
@@ -154,6 +156,7 @@ model InventoryItem {
   hunterId   String
   hunter     Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
   itemKey    String
+  qty        Int      @default(1)
   acquiredAt DateTime @default(now())
 
   @@unique([hunterId, itemKey])

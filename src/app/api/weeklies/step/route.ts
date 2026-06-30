@@ -37,10 +37,10 @@ export async function POST(req: Request) {
       await prisma.attribute.update({ where: { id: attr.id }, data: { level: res.level, xp: res.xp } });
       if (res.leveledUp) levelUps.push({ code: attr.code, name: attr.name, level: res.level });
     }
-    await prisma.hunter.update({ where: { id: hunter.id }, data: { globalLevel: g.level, globalXp: g.xp, gold: hunter.gold + Math.round(gained / 3) } });
+    await prisma.hunter.update({ where: { id: hunter.id }, data: { globalLevel: g.level, globalXp: g.xp, gold: hunter.gold + Math.round(gained / 3), shards: hunter.shards + 2 } });
     const owned = (await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id } })).map((i) => i.itemKey);
     const it = rollLoot(owned, "S", () => 0);
-    if (it) { await prisma.inventoryItem.create({ data: { hunterId: hunter.id, itemKey: it.key } }).catch(() => {}); drop = { key: it.key, name: it.name, rarity: it.rarity }; }
+    if (it) { await prisma.inventoryItem.upsert({ where: { hunterId_itemKey: { hunterId: hunter.id, itemKey: it.key } }, update: { qty: { increment: 1 } }, create: { hunterId: hunter.id, itemKey: it.key } }); drop = { key: it.key, name: it.name, rarity: it.rarity }; }
   }
   await prisma.weekly.update({ where: { id: weekly.id }, data: { stepsJson: JSON.stringify(steps), status: newStatus } });
   return NextResponse.json({ ok: true, rewarded, gained, levelUps, drop });

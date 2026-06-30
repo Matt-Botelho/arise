@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   const owned = (await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id } })).map((i) => i.itemKey);
   const it = rollLoot(owned, quest.difficulty);
   if (it) {
-    await prisma.inventoryItem.create({ data: { hunterId: hunter.id, itemKey: it.key } }).catch(() => {});
+    await prisma.inventoryItem.upsert({ where: { hunterId_itemKey: { hunterId: hunter.id, itemKey: it.key } }, update: { qty: { increment: 1 } }, create: { hunterId: hunter.id, itemKey: it.key } });
     drop = { key: it.key, name: it.name, rarity: it.rarity };
   }
 
