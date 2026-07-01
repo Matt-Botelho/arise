@@ -16,6 +16,8 @@ type Status = {
   attributes: Attr[]; power: number; penalties: Penalty[];
 };
 
+const RANKS = ["F", "E", "D", "C", "B", "A", "S", "S+", "SS", "SS Elite"];
+
 export default function StatutPage() {
   const [data, setData] = useState<Status | null>(null);
   const [equipped, setEquipped] = useState<Equipped | null>(null);
@@ -31,6 +33,8 @@ export default function StatutPage() {
   const gxpPct = h.globalXpNext > 0 ? Math.min(100, Math.round((h.globalXp / h.globalXpNext) * 100)) : 0;
   const floor = h.ceiling - 10;
   const rankPct = Math.max(0, Math.min(100, Math.round(((h.globalLevel - floor) / 10) * 100)));
+  const rankIdx = RANKS.indexOf(h.rank);
+  const attrsOkCount = data.attributes.filter((a) => a.level >= h.attrThreshold).length;
 
   return (
     <div>
@@ -79,23 +83,43 @@ export default function StatutPage() {
           <p className="mt-3 text-center text-xs text-system-text/60">Puissance totale : <span className="text-system-accent">{data.power}</span></p>
         </SystemPanel>
 
-        <SystemPanel title="[ Progression de rang ]">
-          <div className="flex items-center justify-between text-sm">
-            <span>Rang {h.rank}{h.nextRank ? " → " + h.nextRank : " (max)"}</span>
-            <span className="text-system-text/60">Niv. {h.globalLevel}/{h.ceiling}</span>
+        <SystemPanel title="[ Histoire Principale ]">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {RANKS.map((r, i) => {
+              const cur = i === rankIdx; const done = i < rankIdx;
+              return <span key={r} className="rounded border px-2 py-0.5 text-xs" style={{ borderColor: cur ? "#ffcf4d" : done ? "rgba(56,225,255,.45)" : "rgba(95,114,133,.45)", color: cur ? "#ffcf4d" : done ? "#38e1ff" : "#5f7285", textShadow: cur ? "0 0 8px rgba(255,207,77,.4)" : "none" }}>{r}</span>;
+            })}
           </div>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full bg-system-accent" style={{ width: rankPct + "%" }} /></div>
-          {h.rankUpAvailable
-            ? <Link href="/donjons" className="mt-2 block text-sm text-amber-300 system-glow">⩘ Donjon de Changement de Rang débloqué — entre dans l'onglet Donjons !</Link>
-            : h.nextRank
-              ? (
-                <div className="mt-2 text-xs text-system-text/60">
-                  <p>Pour débloquer le Donjon de Rang ({h.rank} → {h.nextRank}) :</p>
-                  <p className={h.levelReady ? "text-emerald-400" : ""}>{h.levelReady ? "✓" : "○"} Niveau {h.ceiling} (actuel {h.globalLevel})</p>
-                  <p className={h.attrsReady ? "text-emerald-400" : ""}>{h.attrsReady ? "✓" : "○"} Chaque attribut ≥ {h.attrThreshold} (min {h.minAttrLevel})</p>
+
+          {h.nextRank ? (
+            <div className="mt-3">
+              <p className="text-xs text-system-text/60">Acte en cours : <span className="text-system-accent">{h.rank}</span> → <span style={{ color: "#ffcf4d" }}>{h.nextRank}</span>. Réunis les conditions pour débloquer le Donjon de Changement de Rang.</p>
+
+              <div className="mt-3">
+                <div className="flex justify-between text-xs"><span className={h.levelReady ? "text-emerald-400" : "text-system-text/70"}>{h.levelReady ? "✓" : "○"} Niveau du rang</span><span className="text-system-text/60">{h.globalLevel}/{h.ceiling}</span></div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: Math.min(100, Math.round((h.globalLevel / h.ceiling) * 100)) + "%", backgroundColor: h.levelReady ? "#48e6a0" : "#38e1ff" }} /></div>
+              </div>
+
+              <div className="mt-3">
+                <div className="flex justify-between text-xs"><span className={h.attrsReady ? "text-emerald-400" : "text-system-text/70"}>{h.attrsReady ? "✓" : "○"} Chaque compétence au niveau {h.attrThreshold}</span><span className="text-system-text/60">{attrsOkCount}/{data.attributes.length}</span></div>
+                <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {data.attributes.map((a) => {
+                    const ok = a.level >= h.attrThreshold; const pct = Math.min(100, Math.round((a.level / Math.max(1, h.attrThreshold)) * 100));
+                    return (
+                      <div key={a.code} className="flex items-center gap-2">
+                        <span className="w-5 text-xs">{a.icon}</span>
+                        <span className="w-8 text-xs text-system-text/50">{a.code}</span>
+                        <div className="h-1.5 flex-1 overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: pct + "%", backgroundColor: ok ? "#48e6a0" : a.color }} /></div>
+                        <span className="w-9 text-right text-xs" style={{ color: ok ? "#48e6a0" : undefined }}>{ok ? "✓ " : ""}{a.level}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-              )
-              : <p className="mt-2 text-xs text-system-text/60">Rang maximal atteint. 👑</p>}
+              </div>
+
+              {h.rankUpAvailable && <Link href="/donjons" className="mt-3 block text-sm text-amber-300 system-glow">⩘ Donjon de Changement de Rang débloqué — entre dans l'onglet Donjons !</Link>}
+            </div>
+          ) : <p className="mt-3 text-xs text-system-text/60">Rang maximal atteint. 👑</p>}
         </SystemPanel>
 
         <SystemPanel title="[ Attributs ]">
