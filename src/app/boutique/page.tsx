@@ -5,6 +5,7 @@ import SystemPanel from "@/components/SystemPanel";
 import { RARITY_COLORS, RARITY_LABEL, SLOT_LABEL, type Rarity, type Slot } from "@/lib/lpc-items";
 import { SELL_VALUE } from "@/lib/loot";
 import { UPGRADE_MAX, upgradeCost } from "@/lib/effects";
+import { CONSUMABLES, BUFF_FIELD } from "@/lib/consumables";
 
 type Reward = { id: string; title: string; cost: number; redeemedAt: string | null };
 type Inv = { itemKey: string; qty: number; plus: number; name: string; slot: string; rarity: string };
@@ -14,25 +15,38 @@ export default function BoutiquePage() {
   const [shards, setShards] = useState(0);
   const [items, setItems] = useState<Inv[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [cons, setCons] = useState<Record<string, number>>({});
+  const [buffs, setBuffs] = useState<Record<string, string>>({});
   const [title, setTitle] = useState("");
   const [cost, setCost] = useState(100);
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
-    const [inv, rw] = await Promise.all([
+    const [inv, rw, cs] = await Promise.all([
       fetch("/api/inventory").then((r) => r.json()),
       fetch("/api/rewards").then((r) => r.json()),
+      fetch("/api/consumables").then((r) => r.json()),
     ]);
-    setGold(inv.gold ?? rw.gold ?? 0);
+    setGold(cs.gold ?? inv.gold ?? 0);
     setShards(inv.shards ?? 0);
     setItems(inv.items ?? []);
     setRewards(rw.rewards ?? []);
+    setCons(cs.consumables ?? {});
+    setBuffs(cs.buffs ?? {});
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
   function flash(m: string) { setToast(m); setTimeout(() => setToast(null), 3000); }
 
+  async function buyCons(key: string) {
+    const r = await fetch("/api/consumables", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }).then((res) => res.json());
+    flash(r.ok ? "Acheté ✓" : (r.error || "Erreur")); load();
+  }
+  async function useCons(key: string) {
+    const r = await fetch("/api/consumables/use", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }).then((res) => res.json());
+    flash(r.ok ? "Activé — 24 h !" : (r.error || "Erreur")); load();
+  }
   async function sell(itemKey: string) {
     const r = await fetch("/api/inventory/sell", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemKey }) }).then((res) => res.json());
     flash(r.ok ? "Vendu : +" + r.value + " or" : (r.error || "Erreur")); load();
@@ -57,6 +71,12 @@ export default function BoutiquePage() {
 
   if (loading) return <p className="animate-pulse text-system-accent">Chargement…</p>;
   const invSorted = [...items].sort((a, b) => (b.qty - a.qty) || a.name.localeCompare(b.name));
+  const now = Date.now();
+  function buffLeft(key: string): number {
+    const iso = buffs[BUFF_FIELD[key]];
+    if (!iso) return 0;
+    return Math.max(0, Math.round((new Date(iso).getTime() - now) / 3600000));
+  }
 
   return (
     <div className="space-y-4">
@@ -66,8 +86,30 @@ export default function BoutiquePage() {
         <p className="text-sm">Or : <span className="text-system-accent system-glow">{gold} 🪙</span> &nbsp;·&nbsp; Éclats : <span className="system-glow" style={{ color: "#b06bff" }}>{shards} ✦</span></p>
       </SystemPanel>
 
+      <SystemPanel title="[ Consommables ]">
+        <ul className="space-y-2">
+          {CONSUMABLES.map((c) => {
+            const owned = cons[c.key] || 0;
+            const isBuff = c.kind === "buff";
+            const left = isBuff ? buffLeft(c.key) : 0;
+            return (
+              <li key={c.key} className="flex items-center justify-between gap-2 border-b border-system-border/20 pb-2 last:border-0">
+                <div>
+                  <p className="text-sm">{c.icon} {c.name} <span className="text-[11px] text-system-text/50">×{owned}{isBuff && left > 0 ? " · actif " + left + "h" : ""}</span></p>
+                  <p className="text-[11px] text-system-text/50">{c.desc}</p>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  {isBuff && owned > 0 && <button onClick={() => useCons(c.key)} className="rounded border border-system-border px-2 py-1 text-[11px] uppercase tracking-widest text-system-accent hover:bg-system-accent/10">Utiliser</button>}
+                  <button onClick={() => buyCons(c.key)} disabled={gold < c.price} className="rounded border border-system-border/60 px-2 py-1 text-[11px] uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">{c.price} 🪙</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </SystemPanel>
+
       <SystemPanel title="[ Atelier — améliorer & vendre ]">
-        <p className="mb-2 text-[11px] text-system-text/40">Améliorer (+N) augmente le bonus d'une pièce ; ça consomme 1 doublon + de l'or. Vendre convertit un doublon en or. Tu gardes toujours 1 exemplaire.</p>
+        <p className="mb-2 text-[11px] text-system-text/40">Améliorer (+N) augmente le bonus d'une pièce (consomme 1 doublon + or). Vendre convertit un doublon en or. Tu gardes toujours 1 exemplaire.</p>
         {invSorted.length === 0 ? (
           <p className="text-sm text-system-text/60">Inventaire vide.</p>
         ) : (
@@ -82,12 +124,8 @@ export default function BoutiquePage() {
                     <p className="text-[11px] text-system-text/50">{SLOT_LABEL[i.slot as Slot] || i.slot} · {RARITY_LABEL[i.rarity as Rarity] || i.rarity}</p>
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    <button onClick={() => upgrade(i.itemKey)} disabled={!canUp} className="rounded border border-system-border px-2 py-1 text-[11px] uppercase tracking-widest text-system-accent hover:bg-system-accent/10 disabled:opacity-30" title={i.plus >= UPGRADE_MAX ? "Max" : "Améliorer"}>
-                      {i.plus >= UPGRADE_MAX ? "Max" : "Améliorer " + upgradeCost(i.plus) + "🪙"}
-                    </button>
-                    <button onClick={() => sell(i.itemKey)} disabled={!hasDupe} className="rounded border border-system-border/50 px-2 py-1 text-[11px] uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">
-                      Vendre +{SELL_VALUE[i.rarity] ?? 0}🪙
-                    </button>
+                    <button onClick={() => upgrade(i.itemKey)} disabled={!canUp} className="rounded border border-system-border px-2 py-1 text-[11px] uppercase tracking-widest text-system-accent hover:bg-system-accent/10 disabled:opacity-30">{i.plus >= UPGRADE_MAX ? "Max" : "Améliorer " + upgradeCost(i.plus) + "🪙"}</button>
+                    <button onClick={() => sell(i.itemKey)} disabled={!hasDupe} className="rounded border border-system-border/50 px-2 py-1 text-[11px] uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">Vendre +{SELL_VALUE[i.rarity] ?? 0}🪙</button>
                   </div>
                 </li>
               );

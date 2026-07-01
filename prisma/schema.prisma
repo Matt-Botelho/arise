@@ -17,6 +17,8 @@ model Hunter {
   maxMp            Int      @default(50)
   gold             Int      @default(0)
   shards           Int      @default(0)
+  consumablesJson  String?
+  buffsJson        String?
   title            String   @default("Le Faible")
   streak           Int      @default(0)
   globalLevel      Int      @default(1)

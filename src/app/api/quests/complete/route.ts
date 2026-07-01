@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { isExhausted } from "@/lib/game";
 import { DIFFICULTY_MULT } from "@/lib/game.config";
 import { gameDay } from "@/lib/date";
-import { rollLoot } from "@/lib/loot";
+import { rollLoot, dropChance } from "@/lib/loot";
 import { applyGlobalXp, applyAttrXp, rankCeiling, rankUpAvailable } from "@/lib/progression";
 import { computeBonuses } from "@/lib/effects";
 
@@ -26,10 +26,14 @@ export async function POST(req: Request) {
   const plusByKey = Object.fromEntries(inv.map((i) => [i.itemKey, i.plus]));
   const equipped = hunter.equippedJson ? JSON.parse(hunter.equippedJson) : {};
   const bonuses = computeBonuses(equipped, plusByKey);
+  const buffs = hunter.buffsJson ? JSON.parse(hunter.buffsJson) : {};
+  const nowMs = Date.now();
+  const xp2x = !!(buffs.xp2xUntil && new Date(buffs.xp2xUntil).getTime() > nowMs);
+  const luck2x = !!(buffs.luck2xUntil && new Date(buffs.luck2xUntil).getTime() > nowMs);
 
   const mult = DIFFICULTY_MULT[quest.difficulty] ?? 1;
   const exhausted = isExhausted(hunter.hp);
-  const gained = Math.round(quest.baseXp * mult * (exhausted ? 0.5 : 1) * (1 + bonuses.xpPct / 100));
+  const gained = Math.round(quest.baseXp * mult * (exhausted ? 0.5 : 1) * (1 + bonuses.xpPct / 100) * (xp2x ? 2 : 1));
 
   const ceiling = rankCeiling(hunter.rank);
   const g = applyGlobalXp(hunter.globalLevel, hunter.globalXp, gained, ceiling);
@@ -55,7 +59,7 @@ export async function POST(req: Request) {
   await prisma.hunter.update({ where: { id: hunter.id }, data: { gold: hunter.gold + goldGain, hp: newHp, globalLevel: g.level, globalXp: g.xp } });
 
   let drop: { key: string; name: string; rarity: string } | null = null;
-  const it = rollLoot(owned, quest.difficulty, Math.random, bonuses.lootPct / 100);
+  const it = rollLoot(owned, quest.difficulty, Math.random, bonuses.lootPct / 100 + (luck2x ? dropChance(quest.difficulty) : 0));
   if (it) {
     await prisma.inventoryItem.upsert({ where: { hunterId_itemKey: { hunterId: hunter.id, itemKey: it.key } }, update: { qty: { increment: 1 } }, create: { hunterId: hunter.id, itemKey: it.key } });
     drop = { key: it.key, name: it.name, rarity: it.rarity };
