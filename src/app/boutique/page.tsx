@@ -9,6 +9,7 @@ import { CONSUMABLES, BUFF_FIELD } from "@/lib/consumables";
 
 type Reward = { id: string; title: string; cost: number; redeemedAt: string | null };
 type Inv = { itemKey: string; qty: number; plus: number; name: string; slot: string; rarity: string };
+type Cosmetic = { key: string; name: string; slot: string; rarity: string; cost: number; owned: boolean };
 
 export default function BoutiquePage() {
   const [gold, setGold] = useState(0);
@@ -17,23 +18,26 @@ export default function BoutiquePage() {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [cons, setCons] = useState<Record<string, number>>({});
   const [buffs, setBuffs] = useState<Record<string, string>>({});
+  const [cosmetics, setCosmetics] = useState<Cosmetic[]>([]);
   const [title, setTitle] = useState("");
   const [cost, setCost] = useState(100);
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
-    const [inv, rw, cs] = await Promise.all([
+    const [inv, rw, cs, cx] = await Promise.all([
       fetch("/api/inventory").then((r) => r.json()),
       fetch("/api/rewards").then((r) => r.json()),
       fetch("/api/consumables").then((r) => r.json()),
+      fetch("/api/cosmetics").then((r) => r.json()),
     ]);
     setGold(cs.gold ?? inv.gold ?? 0);
-    setShards(inv.shards ?? 0);
+    setShards(cx.shards ?? inv.shards ?? 0);
     setItems(inv.items ?? []);
     setRewards(rw.rewards ?? []);
     setCons(cs.consumables ?? {});
     setBuffs(cs.buffs ?? {});
+    setCosmetics(cx.catalog ?? []);
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -46,6 +50,10 @@ export default function BoutiquePage() {
   async function useCons(key: string) {
     const r = await fetch("/api/consumables/use", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }).then((res) => res.json());
     flash(r.ok ? "Activé — 24 h !" : (r.error || "Erreur")); load();
+  }
+  async function buyCosmetic(key: string) {
+    const r = await fetch("/api/cosmetics", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }).then((res) => res.json());
+    flash(r.ok ? "Débloqué ✦ — équipe-le dans Personnage" : (r.error || "Erreur")); load();
   }
   async function sell(itemKey: string) {
     const r = await fetch("/api/inventory/sell", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemKey }) }).then((res) => res.json());
@@ -105,6 +113,21 @@ export default function BoutiquePage() {
               </li>
             );
           })}
+        </ul>
+      </SystemPanel>
+
+      <SystemPanel title="[ Boutique des Éclats ✦ ]">
+        <p className="mb-2 text-[11px] text-system-text/40">Skins de prestige exclusifs : impossibles à obtenir en butin. Les Éclats ✦ (gagnés en donjon et au passage de rang) sont le seul moyen de les débloquer. Une fois acheté, équipe-le depuis Personnage.</p>
+        <ul className="space-y-2">
+          {cosmetics.map((c) => (
+            <li key={c.key} className="flex items-center justify-between gap-2 border-b border-system-border/20 pb-2 last:border-0">
+              <div>
+                <p className="text-sm" style={{ color: RARITY_COLORS[c.rarity as Rarity] }}>{c.name}{c.owned ? " ✓" : ""}</p>
+                <p className="text-[11px] text-system-text/50">{SLOT_LABEL[c.slot as Slot] || c.slot} · {RARITY_LABEL[c.rarity as Rarity] || c.rarity}</p>
+              </div>
+              <button onClick={() => buyCosmetic(c.key)} disabled={c.owned || shards < c.cost} className="shrink-0 rounded border border-system-border px-3 py-1 text-[11px] uppercase tracking-widest hover:bg-system-accent/10 disabled:opacity-30" style={{ color: "#b06bff" }}>{c.owned ? "Possédé" : c.cost + " ✦"}</button>
+            </li>
+          ))}
         </ul>
       </SystemPanel>
 
