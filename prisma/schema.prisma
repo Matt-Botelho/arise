@@ -103,6 +103,7 @@ model Reward {
   hunter     Hunter    @relation(fields: [hunterId], references: [id], onDelete: Cascade)
   title      String
   cost       Int       @default(100)
+  icon       String    @default("🎁")
   redeemedAt DateTime?
 }
 

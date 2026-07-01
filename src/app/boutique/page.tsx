@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import SystemPanel from "@/components/SystemPanel";
+import LpcItemThumb from "@/components/LpcItemThumb";
 import { RARITY_COLORS, RARITY_LABEL, SLOT_LABEL, type Rarity, type Slot } from "@/lib/lpc-items";
 import { SELL_VALUE } from "@/lib/loot";
 import { UPGRADE_MAX, upgradeCost } from "@/lib/effects";
 import { CONSUMABLES, BUFF_FIELD } from "@/lib/consumables";
 
-type Reward = { id: string; title: string; cost: number; redeemedAt: string | null };
+type Reward = { id: string; title: string; cost: number; icon?: string; redeemedAt: string | null };
+const REWARD_EMOJIS = ["🎁","🎮","🍿","🧋","🍕","🍫","🍺","🎬","📚","🎧","🛍️","💆","🏖️","⚽","🎨","☕"];
 type Inv = { itemKey: string; qty: number; plus: number; name: string; slot: string; rarity: string };
 type Cosmetic = { key: string; name: string; slot: string; rarity: string; cost: number; owned: boolean };
 
@@ -21,6 +23,7 @@ export default function BoutiquePage() {
   const [cosmetics, setCosmetics] = useState<Cosmetic[]>([]);
   const [title, setTitle] = useState("");
   const [cost, setCost] = useState(100);
+  const [rewardIcon, setRewardIcon] = useState("🎁");
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,8 +68,8 @@ export default function BoutiquePage() {
   }
   async function add() {
     if (!title.trim()) return;
-    const r = await fetch("/api/rewards", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, cost }) }).then((res) => res.json());
-    if (r.ok) { setTitle(""); setCost(100); load(); } else flash(r.error || "Erreur");
+    const r = await fetch("/api/rewards", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, cost, icon: rewardIcon }) }).then((res) => res.json());
+    if (r.ok) { setTitle(""); setCost(100); setRewardIcon("🎁"); load(); } else flash(r.error || "Erreur");
   }
   async function redeem(id: string) {
     const r = await fetch("/api/rewards/redeem", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).then((res) => res.json());
@@ -121,9 +124,12 @@ export default function BoutiquePage() {
         <ul className="space-y-2">
           {cosmetics.map((c) => (
             <li key={c.key} className="flex items-center justify-between gap-2 border-b border-system-border/20 pb-2 last:border-0">
-              <div>
-                <p className="text-sm" style={{ color: RARITY_COLORS[c.rarity as Rarity] }}>{c.name}{c.owned ? " ✓" : ""}</p>
-                <p className="text-[11px] text-system-text/50">{SLOT_LABEL[c.slot as Slot] || c.slot} · {RARITY_LABEL[c.rarity as Rarity] || c.rarity}</p>
+              <div className="flex items-center gap-2">
+                <div className="shrink-0 rounded bg-black/30" style={{ border: "1px solid " + RARITY_COLORS[c.rarity as Rarity] }}><LpcItemThumb itemKey={c.key} size={44} /></div>
+                <div>
+                  <p className="text-sm" style={{ color: RARITY_COLORS[c.rarity as Rarity] }}>{c.name}{c.owned ? " ✓" : ""}</p>
+                  <p className="text-[11px] text-system-text/50">{SLOT_LABEL[c.slot as Slot] || c.slot} · {RARITY_LABEL[c.rarity as Rarity] || c.rarity}</p>
+                </div>
               </div>
               <button onClick={() => buyCosmetic(c.key)} disabled={c.owned || shards < c.cost} className="shrink-0 rounded border border-system-border px-3 py-1 text-[11px] uppercase tracking-widest hover:bg-system-accent/10 disabled:opacity-30" style={{ color: "#b06bff" }}>{c.owned ? "Possédé" : c.cost + " ✦"}</button>
             </li>
@@ -164,9 +170,12 @@ export default function BoutiquePage() {
           <ul className="space-y-2">
             {rewards.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-3 border-b border-system-border/20 pb-2 last:border-0">
-                <div>
-                  <p className="text-sm">{r.title}</p>
-                  <p className="text-[11px] text-system-text/50">{r.cost} 🪙{r.redeemedAt ? " · déjà débloquée" : ""}</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{r.icon || "🎁"}</span>
+                  <div>
+                    <p className="text-sm">{r.title}</p>
+                    <p className="text-[11px] text-system-text/50">{r.cost} 🪙{r.redeemedAt ? " · déjà débloquée" : ""}</p>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => redeem(r.id)} disabled={gold < r.cost} className="shrink-0 rounded border border-system-border px-3 py-1 text-xs uppercase tracking-widest text-system-accent hover:bg-system-accent/10 disabled:opacity-40">Débloquer</button>
@@ -179,7 +188,13 @@ export default function BoutiquePage() {
       </SystemPanel>
 
       <SystemPanel title="[ Nouvelle récompense réelle ]">
-        <label className="block text-xs uppercase tracking-widest text-system-text/60">Intitulé</label>
+        <label className="block text-xs uppercase tracking-widest text-system-text/60">Icône</label>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {REWARD_EMOJIS.map((em) => (
+            <button key={em} onClick={() => setRewardIcon(em)} className={"rounded border px-2 py-1 text-lg " + (rewardIcon === em ? "border-system-accent bg-system-accent/10" : "border-system-border/30 hover:border-system-accent/50")}>{em}</button>
+          ))}
+        </div>
+        <label className="mt-3 block text-xs uppercase tracking-widest text-system-text/60">Intitulé</label>
         <input className="mt-1 w-full rounded border border-system-border/40 bg-black/40 px-3 py-2 text-sm outline-none focus:border-system-accent" placeholder="Ex. Soirée film, boba, nouveau jeu…" value={title} onChange={(e) => setTitle(e.target.value)} />
         <label className="mt-3 block text-xs uppercase tracking-widest text-system-text/60">Coût (or)</label>
         <input type="number" min={1} className="mt-1 w-full rounded border border-system-border/40 bg-black/40 px-3 py-2 text-sm outline-none focus:border-system-accent" value={cost} onChange={(e) => setCost(parseInt(e.target.value || "1", 10))} />

@@ -13,12 +13,13 @@ export async function GET() {
 export async function POST(req: Request) {
   const hunter = await prisma.hunter.findFirst();
   if (!hunter) return NextResponse.json({ error: "Aucun chasseur" }, { status: 404 });
-  const b = (await req.json().catch(() => ({}))) as { title?: string; cost?: number };
+  const b = (await req.json().catch(() => ({}))) as { title?: string; cost?: number; icon?: string };
   if (!b.title || typeof b.title !== "string" || !b.title.trim()) {
     return NextResponse.json({ error: "Titre requis" }, { status: 400 });
   }
   const cost = Number.isInteger(b.cost) && (b.cost as number) > 0 ? (b.cost as number) : 100;
-  const reward = await prisma.reward.create({ data: { hunterId: hunter.id, title: b.title.trim(), cost } });
+  const icon = typeof b.icon === "string" && b.icon.trim() ? Array.from(b.icon.trim())[0] : "🎁";
+  const reward = await prisma.reward.create({ data: { hunterId: hunter.id, title: b.title.trim(), cost, icon } });
   return NextResponse.json({ ok: true, reward });
 }
 
