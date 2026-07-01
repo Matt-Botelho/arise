@@ -82,6 +82,7 @@ export default function BoutiquePage() {
 
   if (loading) return <p className="animate-pulse text-system-accent">Chargement…</p>;
   const invSorted = [...items].sort((a, b) => (b.qty - a.qty) || a.name.localeCompare(b.name));
+  const rewardsSorted = [...rewards].sort((a, b) => (a.redeemedAt ? 1 : 0) - (b.redeemedAt ? 1 : 0) || a.cost - b.cost);
   const now = Date.now();
   function buffLeft(key: string): number {
     const iso = buffs[BUFF_FIELD[key]];
@@ -92,114 +93,115 @@ export default function BoutiquePage() {
   return (
     <div className="space-y-4">
       {toast && <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded border border-system-border bg-system-panel px-4 py-2 text-sm text-system-accent shadow-system system-glow">[Système] {toast}</div>}
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-lg uppercase tracking-[0.2em] text-system-accent system-glow">Boutique</h1>
+        <span className="text-sm">Or <span className="text-system-accent system-glow">{gold} 🪙</span> · Éclats <span className="system-glow" style={{ color: "#b06bff" }}>{shards} ✦</span></span>
+      </div>
 
-      <SystemPanel title="[ Trésor ]">
-        <p className="text-sm">Or : <span className="text-system-accent system-glow">{gold} 🪙</span> &nbsp;·&nbsp; Éclats : <span className="system-glow" style={{ color: "#b06bff" }}>{shards} ✦</span></p>
-      </SystemPanel>
-
-      <SystemPanel title="[ Consommables ]">
-        <ul className="space-y-2">
-          {CONSUMABLES.map((c) => {
-            const owned = cons[c.key] || 0;
-            const isBuff = c.kind === "buff";
-            const left = isBuff ? buffLeft(c.key) : 0;
-            return (
-              <li key={c.key} className="flex items-center justify-between gap-2 border-b border-system-border/20 pb-2 last:border-0">
-                <div>
-                  <p className="text-sm">{c.icon} {c.name} <span className="text-[11px] text-system-text/50">×{owned}{isBuff && left > 0 ? " · actif " + left + "h" : ""}</span></p>
-                  <p className="text-[11px] text-system-text/50">{c.desc}</p>
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  {isBuff && owned > 0 && <button onClick={() => useCons(c.key)} className="rounded border border-system-border px-2 py-1 text-[11px] uppercase tracking-widest text-system-accent hover:bg-system-accent/10">Utiliser</button>}
-                  <button onClick={() => buyCons(c.key)} disabled={gold < c.price} className="rounded border border-system-border/60 px-2 py-1 text-[11px] uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">{c.price} 🪙</button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </SystemPanel>
-
-      <SystemPanel title="[ Boutique des Éclats ✦ ]">
-        <p className="mb-2 text-[11px] text-system-text/40">Skins de prestige exclusifs : impossibles à obtenir en butin. Les Éclats ✦ (gagnés en donjon et au passage de rang) sont le seul moyen de les débloquer. Une fois acheté, équipe-le depuis Personnage.</p>
-        <ul className="space-y-2">
-          {cosmetics.map((c) => (
-            <li key={c.key} className="flex items-center justify-between gap-2 border-b border-system-border/20 pb-2 last:border-0">
-              <div className="flex items-center gap-2">
-                <div className="shrink-0 rounded bg-black/30" style={{ border: "1px solid " + RARITY_COLORS[c.rarity as Rarity] }}><LpcItemThumb itemKey={c.key} size={44} /></div>
-                <div>
-                  <p className="text-sm" style={{ color: RARITY_COLORS[c.rarity as Rarity] }}>{c.name}{c.owned ? " ✓" : ""}</p>
-                  <p className="text-[11px] text-system-text/50">{SLOT_LABEL[c.slot as Slot] || c.slot} · {RARITY_LABEL[c.rarity as Rarity] || c.rarity}</p>
-                </div>
+      <div className="cards">
+        <SystemPanel title="[ Boutique des Éclats ✦ ]">
+          <p className="mb-3 text-[11px] text-system-text/40">Skins de prestige exclusifs : impossibles à obtenir en butin. Débloque-les avec tes Éclats ✦, puis équipe-les dans Personnage.</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {cosmetics.map((c) => (
+              <div key={c.key} className="flex flex-col items-center rounded border bg-black/20 p-2 text-center" style={{ borderColor: c.owned ? "rgba(31,111,235,0.25)" : RARITY_COLORS[c.rarity as Rarity] }}>
+                <div className="rounded bg-black/40"><LpcItemThumb itemKey={c.key} size={72} /></div>
+                <p className="mt-1 text-xs" style={{ color: RARITY_COLORS[c.rarity as Rarity] }}>{c.name}{c.owned ? " ✓" : ""}</p>
+                <p className="text-[10px] text-system-text/50">{SLOT_LABEL[c.slot as Slot] || c.slot} · {RARITY_LABEL[c.rarity as Rarity] || c.rarity}</p>
+                <button onClick={() => buyCosmetic(c.key)} disabled={c.owned || shards < c.cost} className="mt-2 w-full rounded border border-system-border px-2 py-1 text-[11px] uppercase tracking-widest hover:bg-system-accent/10 disabled:opacity-30" style={{ color: "#b06bff" }}>{c.owned ? "Possédé" : c.cost + " ✦"}</button>
               </div>
-              <button onClick={() => buyCosmetic(c.key)} disabled={c.owned || shards < c.cost} className="shrink-0 rounded border border-system-border px-3 py-1 text-[11px] uppercase tracking-widest hover:bg-system-accent/10 disabled:opacity-30" style={{ color: "#b06bff" }}>{c.owned ? "Possédé" : c.cost + " ✦"}</button>
-            </li>
-          ))}
-        </ul>
-      </SystemPanel>
+            ))}
+          </div>
+        </SystemPanel>
 
-      <SystemPanel title="[ Atelier — améliorer & vendre ]">
-        <p className="mb-2 text-[11px] text-system-text/40">Améliorer (+N) augmente le bonus d'une pièce (consomme 1 doublon + or). Vendre convertit un doublon en or. Tu gardes toujours 1 exemplaire.</p>
-        {invSorted.length === 0 ? (
-          <p className="text-sm text-system-text/60">Inventaire vide.</p>
-        ) : (
+        <SystemPanel title="[ Consommables ]">
           <ul className="space-y-2">
-            {invSorted.map((i) => {
-              const hasDupe = i.qty > 1;
-              const canUp = hasDupe && i.plus < UPGRADE_MAX;
+            {CONSUMABLES.map((c) => {
+              const owned = cons[c.key] || 0;
+              const isBuff = c.kind === "buff";
+              const left = isBuff ? buffLeft(c.key) : 0;
               return (
-                <li key={i.itemKey} className="flex items-center justify-between gap-2 border-b border-system-border/20 pb-2 last:border-0">
+                <li key={c.key} className="flex items-center justify-between gap-2 border-b border-system-border/20 pb-2 last:border-0">
                   <div>
-                    <p className="text-sm" style={{ color: RARITY_COLORS[i.rarity as Rarity] }}>{i.name}{i.plus > 0 ? " +" + i.plus : ""} <span className="text-[11px] text-system-text/50">×{i.qty}</span></p>
-                    <p className="text-[11px] text-system-text/50">{SLOT_LABEL[i.slot as Slot] || i.slot} · {RARITY_LABEL[i.rarity as Rarity] || i.rarity}</p>
+                    <p className="text-sm">{c.icon} {c.name} <span className="text-[11px] text-system-text/50">×{owned}{isBuff && left > 0 ? " · actif " + left + "h" : ""}</span></p>
+                    <p className="text-[11px] text-system-text/50">{c.desc}</p>
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    <button onClick={() => upgrade(i.itemKey)} disabled={!canUp} className="rounded border border-system-border px-2 py-1 text-[11px] uppercase tracking-widest text-system-accent hover:bg-system-accent/10 disabled:opacity-30">{i.plus >= UPGRADE_MAX ? "Max" : "Améliorer " + upgradeCost(i.plus) + "🪙"}</button>
-                    <button onClick={() => sell(i.itemKey)} disabled={!hasDupe} className="rounded border border-system-border/50 px-2 py-1 text-[11px] uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">Vendre +{SELL_VALUE[i.rarity] ?? 0}🪙</button>
+                    {isBuff && owned > 0 && <button onClick={() => useCons(c.key)} className="rounded border border-system-border px-2 py-1 text-[11px] uppercase tracking-widest text-system-accent hover:bg-system-accent/10">Utiliser</button>}
+                    <button onClick={() => buyCons(c.key)} disabled={gold < c.price} className="rounded border border-system-border/60 px-2 py-1 text-[11px] uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">{c.price} 🪙</button>
                   </div>
                 </li>
               );
             })}
           </ul>
-        )}
-      </SystemPanel>
+        </SystemPanel>
 
-      <SystemPanel title="[ Récompenses réelles ]">
-        {rewards.length === 0 ? (
-          <p className="text-sm text-system-text/60">Aucune récompense. Crée-en une ci-dessous (un vrai plaisir à t'offrir avec ton or).</p>
-        ) : (
-          <ul className="space-y-2">
-            {rewards.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-3 border-b border-system-border/20 pb-2 last:border-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{r.icon || "🎁"}</span>
-                  <div>
-                    <p className="text-sm">{r.title}</p>
-                    <p className="text-[11px] text-system-text/50">{r.cost} 🪙{r.redeemedAt ? " · déjà débloquée" : ""}</p>
+        <SystemPanel title="[ Atelier — améliorer & vendre ]">
+          <p className="mb-2 text-[11px] text-system-text/40">Améliorer (+N) augmente le bonus d'une pièce (consomme 1 doublon + or). Vendre convertit un doublon en or. Tu gardes toujours 1 exemplaire.</p>
+          {invSorted.length === 0 ? (
+            <p className="text-sm text-system-text/60">Inventaire vide.</p>
+          ) : (
+            <ul className="space-y-2">
+              {invSorted.map((i) => {
+                const hasDupe = i.qty > 1;
+                const canUp = hasDupe && i.plus < UPGRADE_MAX;
+                return (
+                  <li key={i.itemKey} className="flex items-center justify-between gap-2 border-b border-system-border/20 pb-2 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <div className="shrink-0 rounded bg-black/30" style={{ border: "1px solid " + RARITY_COLORS[i.rarity as Rarity] }}><LpcItemThumb itemKey={i.itemKey} size={48} /></div>
+                      <div>
+                        <p className="text-sm" style={{ color: RARITY_COLORS[i.rarity as Rarity] }}>{i.name}{i.plus > 0 ? " +" + i.plus : ""} <span className="text-[11px] text-system-text/50">×{i.qty}</span></p>
+                        <p className="text-[11px] text-system-text/50">{SLOT_LABEL[i.slot as Slot] || i.slot} · {RARITY_LABEL[i.rarity as Rarity] || i.rarity}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col gap-1">
+                      <button onClick={() => upgrade(i.itemKey)} disabled={!canUp} className="rounded border border-system-border px-2 py-1 text-[11px] uppercase tracking-widest text-system-accent hover:bg-system-accent/10 disabled:opacity-30">{i.plus >= UPGRADE_MAX ? "Max" : "Améliorer " + upgradeCost(i.plus) + "🪙"}</button>
+                      <button onClick={() => sell(i.itemKey)} disabled={!hasDupe} className="rounded border border-system-border/50 px-2 py-1 text-[11px] uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">Vendre +{SELL_VALUE[i.rarity] ?? 0}🪙</button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </SystemPanel>
+
+        <SystemPanel title="[ Récompenses réelles ]">
+          {rewards.length === 0 ? (
+            <p className="text-sm text-system-text/60">Aucune récompense. Crée-en une ci-dessous (un vrai plaisir à t'offrir avec ton or).</p>
+          ) : (
+            <ul className="space-y-2">
+              {rewardsSorted.map((r) => (
+                <li key={r.id} className={"flex items-center justify-between gap-3 border-b border-system-border/20 pb-2 last:border-0 " + (r.redeemedAt ? "opacity-45" : "")}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{r.icon || "🎁"}</span>
+                    <div>
+                      <p className="text-sm">{r.title}</p>
+                      <p className="text-[11px] text-system-text/50">{r.cost} 🪙{r.redeemedAt ? " · déjà débloquée" : ""}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => redeem(r.id)} disabled={gold < r.cost} className="shrink-0 rounded border border-system-border px-3 py-1 text-xs uppercase tracking-widest text-system-accent hover:bg-system-accent/10 disabled:opacity-40">Débloquer</button>
-                  <button onClick={() => del(r.id)} className="shrink-0 rounded border border-red-500/40 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10">✕</button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SystemPanel>
+                  <div className="flex gap-2">
+                    <button onClick={() => redeem(r.id)} disabled={gold < r.cost} className="shrink-0 rounded border border-system-border px-3 py-1 text-xs uppercase tracking-widest text-system-accent hover:bg-system-accent/10 disabled:opacity-40">Débloquer</button>
+                    <button onClick={() => del(r.id)} className="shrink-0 rounded border border-red-500/40 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10">✕</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SystemPanel>
 
-      <SystemPanel title="[ Nouvelle récompense réelle ]">
-        <label className="block text-xs uppercase tracking-widest text-system-text/60">Icône</label>
-        <div className="mt-1 flex flex-wrap gap-1">
-          {REWARD_EMOJIS.map((em) => (
-            <button key={em} onClick={() => setRewardIcon(em)} className={"rounded border px-2 py-1 text-lg " + (rewardIcon === em ? "border-system-accent bg-system-accent/10" : "border-system-border/30 hover:border-system-accent/50")}>{em}</button>
-          ))}
-        </div>
-        <label className="mt-3 block text-xs uppercase tracking-widest text-system-text/60">Intitulé</label>
-        <input className="mt-1 w-full rounded border border-system-border/40 bg-black/40 px-3 py-2 text-sm outline-none focus:border-system-accent" placeholder="Ex. Soirée film, boba, nouveau jeu…" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <label className="mt-3 block text-xs uppercase tracking-widest text-system-text/60">Coût (or)</label>
-        <input type="number" min={1} className="mt-1 w-full rounded border border-system-border/40 bg-black/40 px-3 py-2 text-sm outline-none focus:border-system-accent" value={cost} onChange={(e) => setCost(parseInt(e.target.value || "1", 10))} />
-        <button onClick={add} className="mt-4 w-full rounded border border-system-border px-4 py-3 text-sm uppercase tracking-widest text-system-accent hover:bg-system-accent/10">Ajouter</button>
-      </SystemPanel>
+        <SystemPanel title="[ Nouvelle récompense réelle ]">
+          <label className="block text-xs uppercase tracking-widest text-system-text/60">Icône</label>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {REWARD_EMOJIS.map((em) => (
+              <button key={em} onClick={() => setRewardIcon(em)} className={"rounded border px-2 py-1 text-lg " + (rewardIcon === em ? "border-system-accent bg-system-accent/10" : "border-system-border/30 hover:border-system-accent/50")}>{em}</button>
+            ))}
+          </div>
+          <label className="mt-3 block text-xs uppercase tracking-widest text-system-text/60">Intitulé</label>
+          <input className="mt-1 w-full rounded border border-system-border/40 bg-black/40 px-3 py-2 text-sm outline-none focus:border-system-accent" placeholder="Ex. Soirée film, boba, nouveau jeu…" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <label className="mt-3 block text-xs uppercase tracking-widest text-system-text/60">Coût (or)</label>
+          <input type="number" min={1} className="mt-1 w-full rounded border border-system-border/40 bg-black/40 px-3 py-2 text-sm outline-none focus:border-system-accent" value={cost} onChange={(e) => setCost(parseInt(e.target.value || "1", 10))} />
+          <button onClick={add} className="mt-4 w-full rounded border border-system-border px-4 py-3 text-sm uppercase tracking-widest text-system-accent hover:bg-system-accent/10">Ajouter</button>
+        </SystemPanel>
+      </div>
     </div>
   );
 }

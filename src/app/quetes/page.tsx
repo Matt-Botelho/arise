@@ -99,6 +99,7 @@ export default function QuetesPage() {
       <h1 className="text-lg uppercase tracking-[0.2em] text-system-accent system-glow">Quêtes — {day}</h1>
       {dayThemeCode && (() => { const a = ATTRIBUTES.find((x) => x.code === dayThemeCode); return a ? <p className="text-xs text-system-text/60">Thème du jour : <span style={{ color: a.color }}>{a.icon} {a.name}</span> — privilégie une quête {a.name} pour la quête obligatoire.</p> : null; })()}
 
+      <div className="cards">
       <SystemPanel title="[ Missions hebdomadaires ]">
         {weeklies.length === 0 && <p className="text-sm text-system-text/60">Aucune mission cette semaine.</p>}
         {weeklies.map((w) => {
@@ -151,6 +152,7 @@ export default function QuetesPage() {
       <SystemPanel title="[ Quêtes journalières ]">
         {normal.length === 0 ? <p className="text-sm text-system-text/60">Aucune quête.</p> : normal.map((q) => <Row key={q.id} q={q} onDone={complete} />)}
       </SystemPanel>
+      </div>
     </div>
   );
 }

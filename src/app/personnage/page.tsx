@@ -51,11 +51,11 @@ export default function PersonnagePage() {
         <span className="text-xs text-system-text/60">Collection : {ownedItems.length}/{ITEMS.length}</span>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="grid gap-4 md:gap-6 md:grid-cols-[380px_minmax(0,1fr)]">
         {/* GAUCHE — personnage */}
         <div className="space-y-3 md:sticky md:top-2 md:self-start">
           <SystemPanel title="[ Aperçu ]">
-            <div className="flex justify-center"><LpcAvatar equipped={preview} size={240} /></div>
+            <div className="flex justify-center"><LpcAvatar equipped={preview} size={300} /></div>
             {hover && <p className="mt-1 text-center text-[11px] text-system-accent/80">Aperçu — clique pour équiper</p>}
           </SystemPanel>
 
@@ -99,7 +99,7 @@ export default function PersonnagePage() {
           </div>
 
           <SystemPanel title={"[ " + SLOT_LABEL[activeSlot] + " ]"}>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
               <button onClick={() => equip(activeSlot, null)}
                 className={"flex aspect-square flex-col items-center justify-center gap-1 rounded border text-[10px] " + (!cur ? "border-system-accent text-system-accent" : "border-system-border/30 text-system-text/40 hover:border-system-accent/50")}>
                 <span className="text-lg leading-none">✕</span>Aucun
@@ -115,7 +115,7 @@ export default function PersonnagePage() {
                     onClick={() => equip(it.slot as Slot, it.key, it.colors?.[0]?.name)}
                     className="relative flex flex-col items-center rounded border bg-black/30 p-1"
                     style={{ borderColor: selected ? RARITY_COLORS[it.rarity] : "rgba(31,111,235,0.25)", borderWidth: selected ? 2 : 1 }}>
-                    <LpcItemThumb itemKey={it.key} color={col} size={52} />
+                    <LpcItemThumb itemKey={it.key} color={col} size={62} />
                     <span className="mt-0.5 w-full truncate text-center text-[9px]" style={{ color: RARITY_COLORS[it.rarity] }}>{it.name}</span>
                     {pl > 0 && <span className="absolute right-0.5 top-0.5 rounded bg-black/70 px-1 text-[9px] text-system-accent">+{pl}</span>}
                   </button>

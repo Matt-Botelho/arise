@@ -49,3 +49,12 @@ body {
   100% { transform: scale(1); }
 }
 .anim-pop { animation: popIn 320ms ease-out both; }
+
+/* Disposition en cartes (multi-colonnes sur grand écran) */
+.cards > * { margin-bottom: 1rem; break-inside: avoid; }
+@media (min-width: 1024px) {
+  .cards { column-count: 2; column-gap: 1rem; }
+}
+@media (min-width: 1536px) {
+  .cards { column-count: 3; }
+}

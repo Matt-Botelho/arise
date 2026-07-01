@@ -39,12 +39,12 @@ export default function StatutPage() {
           ✦ Bienvenue Chasseur — lance ton onboarding pour définir tes objectifs et tes quêtes →
         </a>
       )}
-      <div className="md:grid md:grid-cols-[300px_1fr] md:items-start md:gap-4">
+      <div className="md:grid md:grid-cols-[380px_minmax(0,1fr)] md:items-start md:gap-6">
       <div className="mb-4 md:mb-0 md:sticky md:top-4">
         <SystemPanel title="[ Chasseur ]">
           <div className="flex flex-col items-center">
-            {equipped ? <LpcAvatar equipped={equipped} size={264} /> : <div className="h-64 w-full animate-pulse text-center text-system-accent">…</div>}
-            <h1 className="mt-2 text-xl font-bold system-glow">{h.name}</h1>
+            {equipped ? <LpcAvatar equipped={equipped} size={320} /> : <div className="h-[320px] w-full animate-pulse text-center text-system-accent">…</div>}
+            <h1 className="mt-3 text-2xl font-bold system-glow">{h.name}</h1>
             <p className="text-xs text-system-text/70">« {h.title} »</p>
             <div className="mt-1 flex items-end gap-2">
               <span className="text-4xl font-black text-system-accent system-glow">{h.rank}</span>

@@ -80,6 +80,7 @@ export default function DonjonsPage() {
       {toast && <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded border border-system-border bg-system-panel px-4 py-2 text-sm text-system-accent shadow-system system-glow">[Système] {toast}</div>}
       <h1 className="text-lg uppercase tracking-[0.2em] text-system-accent system-glow">Donjons</h1>
 
+      <div className="cards">
       {h && (
         <SystemPanel>
           <p className="text-xs text-system-text/70">
@@ -128,6 +129,7 @@ export default function DonjonsPage() {
 
         <button onClick={create} className="mt-4 w-full rounded border border-system-border px-4 py-3 text-sm uppercase tracking-widest text-system-accent hover:bg-system-accent/10">Créer le donjon</button>
       </SystemPanel>
+      </div>
     </div>
   );
 }

@@ -61,6 +61,7 @@ export default function StatsPage() {
       {toast && <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded border border-system-border bg-system-panel px-4 py-2 text-center text-sm text-system-accent shadow-system system-glow">[Système] {toast}</div>}
       <h1 className="text-lg uppercase tracking-[0.2em] text-system-accent system-glow">Stats & Trophées</h1>
 
+      <div className="cards">
       <SystemPanel title="[ Titre équipé ]">
         <p className="text-sm">Actuel : <span className="text-system-accent system-glow">« {activeTitle || "—"} »</span></p>
         <p className="mt-1 text-[11px] text-system-text/40">S'affiche sur ta fiche de Chasseur (onglet Statut).</p>
@@ -93,12 +94,14 @@ export default function StatsPage() {
           ))}
         </div>
       </SystemPanel>
+      </div>
 
       <div className="flex items-baseline justify-between px-1">
         <h2 className="text-sm uppercase tracking-[0.2em] text-system-accent/80">Trophées</h2>
         <span className="text-xs text-system-text/60">{unlocked}/{achs.length}</span>
       </div>
 
+      <div className="cards">
       {TIERS.map((tier) => {
         const items = achs.filter((a) => a.tier === tier);
         if (!items.length) return null;
@@ -127,6 +130,7 @@ export default function StatsPage() {
           </SystemPanel>
         );
       })}
+      </div>
     </div>
   );
 }

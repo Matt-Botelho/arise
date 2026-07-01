@@ -53,6 +53,7 @@ export default function ObjectifsPage() {
         <a href="/onboarding" className="text-xs uppercase tracking-widest text-system-accent hover:underline">Onboarding →</a>
       </div>
 
+      <div className="cards">
       <SystemPanel title="[ Nouvel objectif ]">
         <div className="flex flex-wrap gap-2">
           <select className="rounded border border-system-border/40 bg-black/40 px-2 py-2 text-sm outline-none" value={code} onChange={(e) => setCode(e.target.value)}>
@@ -132,6 +133,7 @@ export default function ObjectifsPage() {
           })}
         </SystemPanel>
       ))}
+      </div>
     </div>
   );
 }
