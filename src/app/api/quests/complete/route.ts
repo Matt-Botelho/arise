@@ -5,6 +5,7 @@ import { DIFFICULTY_MULT } from "@/lib/game.config";
 import { gameDay } from "@/lib/date";
 import { rollLoot } from "@/lib/loot";
 import { applyGlobalXp, applyAttrXp, rankCeiling, rankUpAvailable } from "@/lib/progression";
+import { computeBonuses } from "@/lib/effects";
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { questId?: string };
@@ -19,15 +20,20 @@ export async function POST(req: Request) {
   const already = await prisma.questLog.findUnique({ where: { questId_date: { questId, date: day } } });
   if (already) return NextResponse.json({ error: "Déjà complétée aujourd'hui" }, { status: 409 });
 
+  // Bonus d'équipement
+  const inv = await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id } });
+  const owned = inv.map((i) => i.itemKey);
+  const plusByKey = Object.fromEntries(inv.map((i) => [i.itemKey, i.plus]));
+  const equipped = hunter.equippedJson ? JSON.parse(hunter.equippedJson) : {};
+  const bonuses = computeBonuses(equipped, plusByKey);
+
   const mult = DIFFICULTY_MULT[quest.difficulty] ?? 1;
   const exhausted = isExhausted(hunter.hp);
-  const gained = Math.round(quest.baseXp * mult * (exhausted ? 0.5 : 1));
+  const gained = Math.round(quest.baseXp * mult * (exhausted ? 0.5 : 1) * (1 + bonuses.xpPct / 100));
 
-  // XP global (plafonné au sommet du rang)
   const ceiling = rankCeiling(hunter.rank);
   const g = applyGlobalXp(hunter.globalLevel, hunter.globalXp, gained, ceiling);
 
-  // XP d'attribut (plafonné par le niveau global)
   const codes: string[] = JSON.parse(quest.attributeCodes || "[]");
   const per = codes.length > 0 ? Math.round(gained / codes.length) : 0;
   const levelUps: { code: string; name: string; level: number }[] = [];
@@ -44,23 +50,19 @@ export async function POST(req: Request) {
 
   await prisma.questLog.create({ data: { questId, hunterId: hunter.id, date: day, status: "done", xpAwarded: gained } });
 
+  const goldGain = Math.round((gained / 5) * (1 + bonuses.goldPct / 100));
   const newHp = Math.min(hunter.maxHp, hunter.hp + 2);
-  await prisma.hunter.update({
-    where: { id: hunter.id },
-    data: { gold: hunter.gold + Math.round(gained / 5), hp: newHp, globalLevel: g.level, globalXp: g.xp },
-  });
+  await prisma.hunter.update({ where: { id: hunter.id }, data: { gold: hunter.gold + goldGain, hp: newHp, globalLevel: g.level, globalXp: g.xp } });
 
-  // Loot : chance de drop d'une pièce non-commune non possédée
   let drop: { key: string; name: string; rarity: string } | null = null;
-  const owned = (await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id } })).map((i) => i.itemKey);
-  const it = rollLoot(owned, quest.difficulty);
+  const it = rollLoot(owned, quest.difficulty, Math.random, bonuses.lootPct / 100);
   if (it) {
     await prisma.inventoryItem.upsert({ where: { hunterId_itemKey: { hunterId: hunter.id, itemKey: it.key } }, update: { qty: { increment: 1 } }, create: { hunterId: hunter.id, itemKey: it.key } });
     drop = { key: it.key, name: it.name, rarity: it.rarity };
   }
 
   return NextResponse.json({
-    ok: true, gained, exhausted,
+    ok: true, gained, goldGain, exhausted,
     globalLevel: g.level, globalLeveledUp: g.leveledUp, atCeiling: g.atCeiling,
     rankUpReady: rankUpAvailable(g.level, hunter.rank),
     levelUps, drop,

@@ -11,8 +11,8 @@ export function dropChance(difficulty: string): number {
 }
 
 // Tire un objet non-commun si le jet réussit. Préfère le neuf ; sinon donne un doublon.
-export function rollLoot(owned: string[], difficulty: string, rnd: () => number = Math.random): LpcItem | null {
-  if (rnd() > dropChance(difficulty)) return null;
+export function rollLoot(owned: string[], difficulty: string, rnd: () => number = Math.random, chanceBonus = 0): LpcItem | null {
+  if (rnd() > dropChance(difficulty) + chanceBonus) return null;
   const have = new Set(owned);
   const pool = ITEMS.filter((i) => i.rarity !== "commun" && i.rarity !== "base");
   if (!pool.length) return null;

@@ -157,6 +157,7 @@ model InventoryItem {
   hunter     Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
   itemKey    String
   qty        Int      @default(1)
+  plus       Int      @default(0)
   acquiredAt DateTime @default(now())
 
   @@unique([hunterId, itemKey])

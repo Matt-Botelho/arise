@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_EQUIPPED, STARTER_ITEMS, ITEMS, ITEM_BY_KEY } from "@/lib/lpc-items";
 import { rankIndex } from "@/lib/game";
+import { computeBonuses } from "@/lib/effects";
 import type { Rank } from "@/lib/game.config";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,9 @@ export async function GET() {
   }
   if (changed) await prisma.hunter.update({ where: { id: hunter.id }, data: { appearanceJson: JSON.stringify(appearance), equippedJson: JSON.stringify(equipped) } });
 
-  const owned = (await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id } })).map((i) => i.itemKey);
-  return NextResponse.json({ appearance, equipped, owned, rankIndex: rankIndex(hunter.rank as Rank), catalog: ITEMS });
+  const inv = await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id } });
+  const owned = inv.map((i) => i.itemKey);
+  const plusByKey: Record<string, number> = Object.fromEntries(inv.map((i) => [i.itemKey, i.plus]));
+  const bonuses = computeBonuses(equipped, plusByKey);
+  return NextResponse.json({ appearance, equipped, owned, plusByKey, bonuses, rankIndex: rankIndex(hunter.rank as Rank), catalog: ITEMS });
 }

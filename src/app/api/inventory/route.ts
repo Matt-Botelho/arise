@@ -9,7 +9,7 @@ export async function GET() {
   if (!hunter) return NextResponse.json({ error: "Aucun chasseur" }, { status: 404 });
   const inv = await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id } });
   const items = inv
-    .map((i) => { const it = ITEM_BY_KEY[i.itemKey]; return it ? { itemKey: i.itemKey, qty: i.qty, name: it.name, slot: it.slot, rarity: it.rarity } : null; })
+    .map((i) => { const it = ITEM_BY_KEY[i.itemKey]; return it ? { itemKey: i.itemKey, qty: i.qty, plus: i.plus, name: it.name, slot: it.slot, rarity: it.rarity } : null; })
     .filter(Boolean);
   return NextResponse.json({ gold: hunter.gold, shards: hunter.shards, items });
 }
