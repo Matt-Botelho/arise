@@ -16,11 +16,12 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#05080f" };
 
 const links: [string, string][] = [
-  ["/", "Statut"],
+  ["/", "QG"],
   ["/quetes", "Quêtes"],
   ["/objectifs", "Aventure"],
   ["/donjons", "Donjons"],
   ["/boutique", "Boutique"],
+  ["/statut", "Statut"],
   ["/stats", "Stats"],
   ["/configuration", "⚙ Config"],
 ];

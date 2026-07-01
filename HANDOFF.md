@@ -336,6 +336,24 @@ pour que les faux positifs Prisma locaux restent couverts par la règle de valid
 prestige · `Méréons ❖` (offrandes Almanax/Failles) → reliques du Temple. Chaque monnaie a
 sa boucle et son rythme.
 
+### V2.1 — QG, Boutique refondue, 30 succès, Collections, import de plan
+- **QG** : `/` est désormais un **dashboard** (bandeau chasseur compact + Porte/Almanax/Serments
+  + quêtes du jour avec validation rapide + top objectifs + hebdos). L'ancienne fiche est sur
+  **`/statut`** (nav mise à jour). Le QG réutilise `LootCard` pour les drops.
+- **Boutique** : refonte en **sous-onglets** (Atelier ⚒️ par défaut, Éclats ✦, Temple ❖,
+  Consommables, Récompenses) + header monnaies **sticky** + badges "!" quand un achat est
+  possible + recherche/tri/filtre doublons dans l'Atelier + hover glow (`.shop-card`).
+- **30 succès** (22 + 8 V2 : Portes, Ombre, panoplies possédées, Méréons, note S).
+  `AchCtx` étendu (gatesCleared, setsOwned, shadowEssence, mereons, bestWeekScore) — le
+  ctx est construit dans `api/achievements`. 4 nouveaux skins de succès (barbuta, mail,
+  flattop, bascinet) — automatiquement exclus du loot via `ACHIEVEMENT_SKINS`.
+- **Collections** : section "Panoplies" dans /stats — chaque pièce avec provenance
+  (🎲 Butin / 🏆 Succès / ✦ Éclats / ❖ Temple), paliers de bonus, statut possédé.
+- **Import de plan** : `POST /api/plan/import` + UI dans Config→Assistant. Format :
+  `{ plan: { objectives: [{ ref, parentRef, title, attributeCode, horizon, kind, …, quests: [...] }], weeklies, dungeons, rewards } }`.
+  Additif uniquement ; les `ref` lient l'arbre ; `metricKey` accepte les alias santé.
+  → Permet à une IA de générer toute la structure d'aventure depuis les objectifs réels.
+
 ### ⚠ Pièges V2
 - `award.ts` importe la moitié des libs : tout nouveau bonus doit passer PAR LUI (ne pas
   recalculer l'XP dans une route).

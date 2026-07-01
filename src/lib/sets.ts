@@ -139,6 +139,10 @@ const LORE: Record<string, string> = {
   legs_fur: "La puissance brute se moque de l'élégance.",
   legs_skirts_legion: "Tenue de parade des armées du Monarque.",
   hair_beards_winter: "La sagesse pousse sur les visages patients.",
+  headwear_hat_helmet_barbuta: "Quinze Portes franchies ont forgé ce heaume.",
+  headwear_hat_helmet_mail: "Tissé de l'essence d'une Ombre au stade Garou.",
+  headwear_hat_helmet_flattop: "Décerné pour une semaine sans la moindre faille.",
+  headwear_hat_helmet_bascinet: "Le trophée des grands collectionneurs de panoplies.",
 };
 const GENERIC_LORE: Record<string, string[]> = {
   rare: ["Trouvé sur le seuil d'une Porte de rang D.", "Un artefact mineur, mais le Système l'a jugé digne.", "Son précédent porteur a abandonné. Pas toi."],

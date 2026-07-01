@@ -4,6 +4,8 @@ import { ACHIEVEMENTS, evaluateAchievements, type AchCtx } from "@/lib/achieveme
 import { totalPower } from "@/lib/game";
 import { rankIndex } from "@/lib/progression";
 import { ITEM_BY_KEY } from "@/lib/lpc-items";
+import { SETS, setProgress } from "@/lib/sets";
+import { DEFAULT_SHADOW, type ShadowState } from "@/lib/shadow";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,12 @@ export async function GET() {
 
   const questsDone = await prisma.questLog.count({ where: { hunterId: hunter.id, status: "done" } });
   const dungeonsCleared = await prisma.dungeon.count({ where: { hunterId: hunter.id, status: "cleared" } });
+  const gatesCleared = await prisma.gate.count({ where: { hunterId: hunter.id, status: "cleared" } }).catch(() => 0);
+  const inv = await prisma.inventoryItem.findMany({ where: { hunterId: hunter.id }, select: { itemKey: true } });
+  const ownedKeys = new Set(inv.map((i) => i.itemKey));
+  const setsOwned = SETS.filter((s) => setProgress(s, ownedKeys).owned >= s.items.length).length;
+  let shadow: ShadowState = DEFAULT_SHADOW;
+  try { if (hunter.shadowJson) shadow = JSON.parse(hunter.shadowJson); } catch {}
   const levels = hunter.attributes.map((a) => a.level);
   const ctx: AchCtx = {
     rankIndex: rankIndex(hunter.rank),
@@ -23,6 +31,11 @@ export async function GET() {
     streak: hunter.streak,
     questsDone,
     dungeonsCleared,
+    gatesCleared,
+    setsOwned,
+    shadowEssence: shadow.essence || 0,
+    mereons: hunter.mereons || 0,
+    bestWeekScore: hunter.bestWeekScore || 0,
   };
 
   const evaluated = evaluateAchievements(ctx);

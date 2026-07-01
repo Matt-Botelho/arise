@@ -8,6 +8,12 @@ export type AchCtx = {
   streak: number;
   questsDone: number;
   dungeonsCleared: number;
+  // V2 : nouveaux systèmes
+  gatesCleared: number;    // Portes franchies
+  setsOwned: number;       // panoplies complètes POSSÉDÉES
+  shadowEssence: number;   // essence de l'Ombre
+  mereons: number;         // Méréons ❖ en poche
+  bestWeekScore: number;   // record de note de semaine
 };
 
 export type Tier = "bronze" | "argent" | "or" | "legendaire";
@@ -49,6 +55,16 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: "power_100", name: "Puissance 100", description: "Puissance totale de 100", icon: "💥", tier: "or", reward: { gold: 300, shards: 8, skin: "legs_fur" }, check: (c) => c.totalPower >= 100 },
   { key: "balanced_10", name: "Maître Polyvalent", description: "Tous les attributs au niveau 10+", icon: "🧩", tier: "or", reward: { gold: 350, shards: 10, skin: "torso_clothes_longsleeve_formal" }, check: (c) => c.minAttrLevel >= 10 },
   { key: "dungeon_10", name: "Conquérant", description: "Terminer 10 donjons", icon: "🗡️", tier: "or", reward: { gold: 350, shards: 10, skin: "feet_boots_rim" }, check: (c) => c.dungeonsCleared >= 10 },
+
+  // --- V2 : Portes, Ombre, Panoplies, Temple, Semaines ---
+  { key: "gate_1", name: "Franchisseur", description: "Franchir ta première Porte", icon: "⛩️", tier: "bronze", reward: { gold: 60, shards: 0 }, check: (c) => c.gatesCleared >= 1 },
+  { key: "shadow_7", name: "Éveilleur d'Ombre", description: "Ton Ombre atteint le stade Loup (7 jours parfaits)", icon: "🐺", tier: "argent", reward: { gold: 150, shards: 3 }, check: (c) => c.shadowEssence >= 7 },
+  { key: "set_first", name: "Collectionneur", description: "Posséder une panoplie complète", icon: "🧥", tier: "argent", reward: { gold: 180, shards: 5 }, check: (c) => c.setsOwned >= 1 },
+  { key: "mereons_30", name: "Fidèle du Temple", description: "Détenir 30 Méréons ❖", icon: "❖", tier: "argent", reward: { gold: 150, shards: 3 }, check: (c) => c.mereons >= 30 },
+  { key: "gates_15", name: "Gardien des Portes", description: "Franchir 15 Portes", icon: "🚪", tier: "or", reward: { gold: 300, shards: 8, skin: "headwear_hat_helmet_barbuta" }, check: (c) => c.gatesCleared >= 15 },
+  { key: "shadow_30", name: "Maître des Ombres", description: "Ton Ombre atteint le stade Garou (30 jours parfaits)", icon: "🌑", tier: "or", reward: { gold: 350, shards: 10, skin: "headwear_hat_helmet_mail" }, check: (c) => c.shadowEssence >= 30 },
+  { key: "week_S", name: "Semaine Parfaite", description: "Obtenir une note de semaine S (400+ pts)", icon: "🏅", tier: "or", reward: { gold: 300, shards: 8, skin: "headwear_hat_helmet_flattop" }, check: (c) => c.bestWeekScore >= 400 },
+  { key: "sets_3", name: "Grand Collectionneur", description: "Posséder 3 panoplies complètes", icon: "👘", tier: "legendaire", reward: { gold: 600, shards: 20, skin: "headwear_hat_helmet_bascinet" }, check: (c) => c.setsOwned >= 3 },
 
   // --- Légendaire (skin rare) ---
   { key: "rank_S", name: "Souverain", description: "Atteindre le rang S", icon: "🌟", tier: "legendaire", reward: { gold: 600, shards: 20, skin: "headwear_hat_helmet_maximus" }, check: (c) => c.rankIndex >= 6 },

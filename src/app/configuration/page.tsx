@@ -72,6 +72,8 @@ export default function ConfigurationPage() {
   const [health, setHealth] = useState<HealthLatest>({}); const [healthCount, setHealthCount] = useState(0);
   const [aTitle, setATitle] = useState(""); const [aMetric, setAMetric] = useState("steps"); const [aThreshold, setAThreshold] = useState(8000); const [aCodes, setACodes] = useState<string[]>([]); const [aXp, setAXp] = useState(50); const [aMand, setAMand] = useState(false);
   const [gatePoolText, setGatePoolText] = useState("");
+  const [planText, setPlanText] = useState("");
+  const [importing, setImporting] = useState(false);
 
   async function load() {
     const [q, w, o, d, rw, st, stt, he] = await Promise.all([
@@ -162,6 +164,17 @@ export default function ConfigurationPage() {
     await fetch("/api/objectives", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, metricKey: metricKey || null }) });
     flash(metricKey ? "Objectif lié à Apple Santé ✓" : "Lien retiré"); load();
   }
+  async function importPlan() {
+    let parsed: unknown;
+    try { parsed = JSON.parse(planText); } catch { flash("JSON invalide — vérifie le copier-coller."); return; }
+    setImporting(true);
+    const r = await fetch("/api/plan/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsed) }).then((x) => x.json()).catch(() => ({ error: "Erreur réseau" }));
+    setImporting(false);
+    if (r.error) { flash(r.error); return; }
+    playLevelUp();
+    flash("Plan importé ✓ — " + r.objectives + " objectifs, " + r.quests + " quêtes, " + r.weeklies + " hebdos, " + r.dungeons + " donjons, " + r.rewards + " récompenses" + (r.warnings?.length ? " · ⚠ " + r.warnings.length + " avertissement(s)" : ""));
+    setPlanText(""); load();
+  }
   async function enableNotifs() {
     try {
       if (!("Notification" in window) || !("serviceWorker" in navigator)) { flash("Notifications non supportées ici"); return; }
@@ -197,7 +210,14 @@ export default function ConfigurationPage() {
       </div>
 
       {tab === "assistant" && (
-        <SystemPanel title="[ ✨ Assistant d'objectif ]"><ObjectiveWizard onDone={load} /></SystemPanel>
+        <div className="cards">
+          <SystemPanel title="[ ✨ Assistant d'objectif ]"><ObjectiveWizard onDone={load} /></SystemPanel>
+          <SystemPanel title="[ 📥 Importer un plan complet (JSON) ]">
+            <p className="mb-2 text-xs text-system-text/50">Colle ici un plan généré par l&apos;IA : arbre d&apos;objectifs (long → moyen → court), quêtes journalières & auto, missions hebdo, donjons et récompenses. L&apos;import est purement additif (rien n&apos;est supprimé).</p>
+            <textarea className={"h-48 font-mono text-xs " + inputCls} placeholder={'{ "plan": { "objectives": [ { "ref": "sante", "title": "…", "attributeCode": "VIT", "horizon": "long", … } ], "dungeons": […] } }'} value={planText} onChange={(e) => setPlanText(e.target.value)} />
+            <button onClick={importPlan} disabled={!planText.trim() || importing} className={"mt-2 w-full " + btnCls + " disabled:opacity-30"}>{importing ? "Import en cours…" : "Importer le plan"}</button>
+          </SystemPanel>
+        </div>
       )}
 
       {tab === "quetes" && (

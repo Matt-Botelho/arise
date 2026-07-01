@@ -1,204 +1,263 @@
 "use client";
+// QG — le dashboard principal : tout ce qui compte aujourd'hui, en un écran.
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import SystemPanel from "@/components/SystemPanel";
 import LpcAvatar from "@/components/LpcAvatar";
 import ShadowCompanion from "@/components/ShadowCompanion";
+import LootCard, { type LootDrop } from "@/components/LootCard";
 import { DEFAULT_EQUIPPED, type Equipped } from "@/lib/lpc-items";
+import { ATTRIBUTES } from "@/lib/game.config";
+import { METRIC_BY_KEY } from "@/lib/health";
+import { setSfxEnabled, playXp, playLevelUp, playLoot, playObjective } from "@/lib/sfx";
 
-type Attr = { id: string; code: string; name: string; icon: string; color: string; level: number; xp: number; xpNext: number; capped: boolean };
-type Penalty = { id: string; date: string; reason: string; hpLost: number; xpLost: number };
+type Quest = { id: string; title: string; type: string; attributeCodes: string[]; baseXp: number; difficulty: string; isMandatory: boolean; done: boolean; metricKey?: string | null; threshold?: number | null; todayValue?: number };
+type Weekly = { id: string; title: string; steps: { label: string; done: boolean }[]; status: string };
+type Obj = { id: string; title: string; horizon: string; status: string; frac: number; done: boolean; attributeCode: string; parentId: string | null };
 type Status = {
-  hunter: {
-    name: string; rank: string; globalLevel: number; globalXp: number; globalXpNext: number;
-    ceiling: number; nextRank: string | null; rankUpAvailable: boolean; attrThreshold: number; minAttrLevel: number; levelReady: boolean; attrsReady: boolean;
-    hp: number; maxHp: number; mp: number; maxMp: number; gold: number; title: string; streak: number; exhausted: boolean; onboarded: boolean;
-  };
-  attributes: Attr[]; power: number; penalties: Penalty[];
-  shadow?: { essence: number; fed: boolean; stage: { key: string; name: string; xpPct: number; desc: string }; next: { name: string; at: number } | null };
-  sets?: { active: { key: string; name: string; color: string; pieces: number; total: number }[]; completed: string[]; xpPct: number; goldPct: number; lootPct: number };
-  mereons?: number;
+  hunter: { name: string; rank: string; globalLevel: number; globalXp: number; globalXpNext: number; rankUpAvailable: boolean; hp: number; maxHp: number; gold: number; title: string; streak: number; onboarded: boolean };
+  shadow?: { essence: number; fed: boolean; stage: { key: string; name: string; xpPct: number } };
+  sets?: { completed: string[]; active: { key: string; name: string; color: string; pieces: number; total: number }[] };
+  mereons?: number; bestWeekScore?: number;
 };
+type Almanax = { offering: { title: string; desc: string; mereons: number; done: boolean }; mereons: number };
+type Gate = { id: string; rank: string; title: string; gold: number; xp: number; status: string; color: string };
+type OathsInfo = { catalog: { key: string; name: string; icon: string; xpMult: number }[]; active: string[]; locked: boolean };
 
-const RANKS = ["F", "E", "D", "C", "B", "A", "S", "S+", "SS", "SS Elite"];
-
-export default function StatutPage() {
-  const [data, setData] = useState<Status | null>(null);
+export default function QGPage() {
+  const [status, setStatus] = useState<Status | null>(null);
   const [equipped, setEquipped] = useState<Equipped | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    fetch("/api/status").then((r) => r.json()).then((d) => (d.error ? setErr(d.error) : setData(d))).catch((e) => setErr(String(e)));
-    fetch("/api/character").then((r) => r.json()).then((d) => { if (!d.error) setEquipped(d.equipped || DEFAULT_EQUIPPED); }).catch(() => {});
-  }, []);
-  if (err) return <p className="text-red-400">{err}</p>;
-  if (!data) return <p className="animate-pulse text-system-accent">Connexion au Système…</p>;
-  const h = data.hunter;
-  const hpPct = h.maxHp > 0 ? Math.max(0, Math.round((h.hp / h.maxHp) * 100)) : 0;
-  const gxpPct = h.globalXpNext > 0 ? Math.min(100, Math.round((h.globalXp / h.globalXpNext) * 100)) : 0;
-  const floor = h.ceiling - 10;
-  const rankPct = Math.max(0, Math.min(100, Math.round(((h.globalLevel - floor) / 10) * 100)));
-  const rankIdx = RANKS.indexOf(h.rank);
-  const attrsOkCount = data.attributes.filter((a) => a.level >= h.attrThreshold).length;
-  const completedSet = data.sets && data.sets.completed.length ? data.sets.active.find((s) => data.sets && data.sets.completed.includes(s.key)) : null;
+  const [quests, setQuests] = useState<Quest[]>([]);
+  const [weeklies, setWeeklies] = useState<Weekly[]>([]);
+  const [objs, setObjs] = useState<Obj[]>([]);
+  const [almanax, setAlmanax] = useState<Almanax | null>(null);
+  const [gate, setGate] = useState<Gate | null>(null);
+  const [oaths, setOaths] = useState<OathsInfo | null>(null);
+  const [drop, setDrop] = useState<LootDrop | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    const [st, q, w, o, al, ga, oa, ch] = await Promise.all([
+      fetch("/api/status").then((r) => r.json()),
+      fetch("/api/quests").then((r) => r.json()),
+      fetch("/api/weeklies").then((r) => r.json()).catch(() => null),
+      fetch("/api/objectives").then((r) => r.json()).catch(() => null),
+      fetch("/api/almanax").then((r) => r.json()).catch(() => null),
+      fetch("/api/gates").then((r) => r.json()).catch(() => null),
+      fetch("/api/oaths").then((r) => r.json()).catch(() => null),
+      fetch("/api/character").then((r) => r.json()).catch(() => null),
+    ]);
+    if (!st.error) setStatus(st);
+    setQuests((q.quests || []).filter((x: Quest) => x.type !== "rankup"));
+    setSfxEnabled(q.sfxEnabled !== false);
+    if (w && !w.error) setWeeklies(w.weeklies || []);
+    if (o && !o.error) setObjs(o.objectives || []);
+    if (al && !al.error) setAlmanax(al);
+    setGate(ga && ga.gate ? ga.gate : null);
+    if (oa && !oa.error) setOaths(oa);
+    if (ch && !ch.error) setEquipped(ch.equipped || DEFAULT_EQUIPPED);
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, []);
+  function flash(m: string, ms = 5000) { setToast(m); setTimeout(() => setToast(null), ms); }
+
+  async function complete(id: string) {
+    const r = await fetch("/api/quests/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questId: id }) }).then((res) => res.json());
+    if (r.error) { flash(r.error, 3000); return; }
+    if (r.globalLeveledUp || (r.levelUps && r.levelUps.length)) playLevelUp(); else playXp();
+    if (r.drop) { playLoot(r.drop.rarity); setDrop(r.drop); }
+    if (r.objective?.justCompleted) playObjective();
+    let msg = "+" + r.gained + " XP · +" + r.goldGain + " or";
+    if (r.almanax) msg += " · ❖ Offrande accomplie !";
+    flash(msg); load();
+  }
+  async function clearGate() {
+    if (!gate) return;
+    const r = await fetch("/api/gates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: gate.id }) }).then((res) => res.json());
+    if (r.error) { flash(r.error, 3000); return; }
+    playLevelUp();
+    flash("⛩ Porte franchie ! +" + r.gained + " XP, +" + r.goldGain + " or", 6000);
+    load();
+  }
+  async function claimAlmanax() {
+    const r = await fetch("/api/almanax", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "claim" }) }).then((res) => res.json());
+    if (r.error) { flash(r.error, 3500); return; }
+    playObjective();
+    flash("❖ Offrande accomplie : +" + r.reward.mereons + " ❖, +" + r.reward.gold + " or");
+    load();
+  }
+
+  if (loading) return <p className="animate-pulse text-system-accent">Connexion au Système…</p>;
+  const h = status?.hunter;
+  const remaining = quests.filter((q) => !q.done);
+  const doneCount = quests.length - remaining.length;
+  const gxpPct = h && h.globalXpNext > 0 ? Math.min(100, Math.round((h.globalXp / h.globalXpNext) * 100)) : 0;
+  const hpPct = h && h.maxHp > 0 ? Math.max(0, Math.round((h.hp / h.maxHp) * 100)) : 0;
+  const mainObjs = objs.filter((o) => o.status !== "done" && !o.done && o.horizon === "long").slice(0, 3);
+  const shortObjs = objs.filter((o) => o.status !== "done" && !o.done && o.horizon === "court").slice(0, 4);
+  const weeklyActive = weeklies.filter((w) => w.status !== "done");
+  const completedSet = status?.sets && status.sets.completed.length ? status.sets.active.find((s) => status.sets?.completed.includes(s.key)) : null;
 
   return (
-    <div>
-      {!h.onboarded && (
-        <a href="/onboarding" className="mb-4 block rounded-md border border-amber-400/60 bg-amber-400/10 p-3 text-center text-sm text-amber-200 system-glow">
+    <div className="space-y-4">
+      {toast && <div className="fixed left-1/2 top-4 z-50 w-max max-w-[92vw] -translate-x-1/2 rounded border border-system-border bg-system-panel px-4 py-2 text-center text-sm text-system-accent shadow-system system-glow">[Système] {toast}</div>}
+      {drop && <LootCard drop={drop} onClose={() => setDrop(null)} />}
+      {h && !h.onboarded && (
+        <a href="/onboarding" className="block rounded-md border border-amber-400/60 bg-amber-400/10 p-3 text-center text-sm text-amber-200 system-glow">
           ✦ Bienvenue Chasseur — lance ton onboarding pour définir tes objectifs et tes quêtes →
         </a>
       )}
-      <div className="md:grid md:grid-cols-[380px_minmax(0,1fr)] md:items-start md:gap-6">
-      <div className="mb-4 md:mb-0 md:sticky md:top-4">
-        <SystemPanel title="[ Chasseur ]">
-          <div className="flex flex-col items-center">
-            {equipped ? (
-              <div className="relative">
-                {completedSet && <div className="avatar-aura" style={{ "--aura": completedSet.color + "59" } as React.CSSProperties} />}
-                <div className="avatar-breathe relative"><LpcAvatar equipped={equipped} size={320} /></div>
-              </div>
-            ) : <div className="h-[320px] w-full animate-pulse text-center text-system-accent">…</div>}
-            {completedSet && <p className="mt-1 text-xs" style={{ color: completedSet.color }}>✦ {completedSet.name} — complète</p>}
-            <h1 className="mt-3 text-2xl font-bold system-glow">{h.name}</h1>
-            <p className="text-xs text-system-text/70">« {h.title} »</p>
-            <div className="mt-1 flex items-end gap-2">
-              <span className="text-4xl font-black text-system-accent system-glow">{h.rank}</span>
-              <span className="mb-1 text-sm text-system-text/70">Niv. {h.globalLevel}</span>
+
+      {/* Bandeau chasseur compact */}
+      {h && (
+        <div className="system-in flex flex-wrap items-center gap-4 rounded-md border border-system-border/60 bg-system-panel/70 p-3 shadow-system">
+          <Link href="/statut" className="relative shrink-0" title="Voir la fiche complète">
+            {completedSet && <div className="avatar-aura" style={{ "--aura": completedSet.color + "59" } as React.CSSProperties} />}
+            <div className="avatar-breathe relative"><LpcAvatar equipped={equipped || DEFAULT_EQUIPPED} size={96} /></div>
+          </Link>
+          <div className="min-w-[180px] flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black text-system-accent system-glow">{h.rank}</span>
+              <span className="font-bold">{h.name}</span>
+              <span className="text-xs text-system-text/60">Niv. {h.globalLevel} · « {h.title} »</span>
             </div>
-            {h.exhausted && <span className="mt-1 rounded border border-red-500/60 px-2 py-0.5 text-[11px] uppercase tracking-widest text-red-400">⚠ Épuisé</span>}
-            <Link href="/personnage" className="mt-3 rounded border border-system-border px-3 py-1 text-xs uppercase tracking-widest text-system-accent hover:bg-system-accent/10">Personnaliser →</Link>
+            <div className="mt-1.5 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: (h.rankUpAvailable ? 100 : gxpPct) + "%", backgroundColor: h.rankUpAvailable ? "#ffcf4d" : "#38e1ff" }} /></div>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: hpPct + "%", backgroundColor: hpPct < 30 ? "#ff4d4d" : "#ff7a45" }} /></div>
+            {h.rankUpAvailable && <Link href="/donjons" className="mt-1 block text-xs text-amber-300 system-glow">⩘ Donjon de rang débloqué !</Link>}
           </div>
-        </SystemPanel>
+          <div className="flex shrink-0 flex-wrap gap-1.5 text-sm">
+            <span className="rounded border border-system-border/40 bg-black/30 px-2 py-1">🔥 {h.streak}</span>
+            <span className="rounded border border-system-border/40 bg-black/30 px-2 py-1">🪙 {h.gold}</span>
+            <span className="rounded border border-system-border/40 bg-black/30 px-2 py-1" style={{ color: "#ffcf4d" }}>❖ {status?.mereons ?? 0}</span>
+            {status?.shadow && (
+              <span className="flex items-center gap-1 rounded border border-system-border/40 bg-black/30 px-2 py-1" title={status.shadow.stage.name}>
+                <ShadowCompanion stageKey={status.shadow.stage.key} fed={status.shadow.fed} size={22} />
+                <span className="text-xs" style={{ color: status.shadow.fed ? "#b06bff" : "#5f7285" }}>{status.shadow.fed ? "+" + status.shadow.stage.xpPct + "%" : "😴"}</span>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Événements du jour : Porte + Almanax + Serments */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {gate && gate.status === "open" ? (
+          <div className="anim-pop rounded-md border p-3" style={{ borderColor: gate.color, boxShadow: "0 0 14px " + gate.color + "44" }}>
+            <p className="text-xs uppercase tracking-[0.2em]" style={{ color: gate.color }}>⛩ Porte de rang {gate.rank}</p>
+            <p className="mt-1 text-sm font-bold">{gate.title}</p>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-xs text-system-text/50">+{gate.xp} XP · +{gate.gold} or · expire ce soir</span>
+              <button onClick={clearGate} className="rounded border px-2.5 py-1 text-xs uppercase tracking-widest hover:bg-white/5" style={{ borderColor: gate.color, color: gate.color }}>Franchir</button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-system-border/30 bg-black/20 p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-system-text/40">⛩ Portes</p>
+            <p className="mt-1 text-sm text-system-text/50">{gate ? "Porte du jour franchie ✓" : "Aucune Porte aujourd'hui. Le Système observe…"}</p>
+          </div>
+        )}
+
+        {almanax && (
+          <div className="rounded-md border border-amber-400/40 bg-amber-400/5 p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-300">☀ Almanax</p>
+            <p className={"mt-1 text-sm " + (almanax.offering.done ? "text-emerald-400" : "")}>{almanax.offering.done ? "✓ " : "✦ "}{almanax.offering.title}</p>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-xs text-system-text/50">{almanax.offering.desc} (+{almanax.offering.mereons} ❖)</span>
+              {!almanax.offering.done && <button onClick={claimAlmanax} className="rounded border border-amber-400/60 px-2.5 py-1 text-xs uppercase tracking-widest text-amber-300 hover:bg-amber-400/10">Valider</button>}
+            </div>
+          </div>
+        )}
+
+        {oaths && (
+          <div className="rounded-md border border-system-border/40 bg-black/20 p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-system-accent">⚔️ Serments</p>
+            {oaths.locked ? (
+              <p className="mt-1 text-sm">{oaths.active.map((k) => { const o = oaths.catalog.find((x) => x.key === k); return o ? o.icon + " " + o.name + " " : ""; })}<span className="text-xs text-emerald-400">scellés</span></p>
+            ) : (
+              <p className="mt-1 text-sm text-system-text/60">Aucun serment prêté. <Link href="/quetes" className="text-system-accent hover:underline">Multiplier mes gains →</Link></p>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="space-y-4">
-        <SystemPanel title="[ Fenêtre de Statut ]">
-          <div>
-            <div className="flex justify-between text-[11px] uppercase tracking-widest text-system-text/50">
-              <span>Niveau {h.globalLevel} / 100</span>
-              <span>{h.rankUpAvailable ? "PALIER ATTEINT" : h.globalXp + " / " + h.globalXpNext + " XP"}</span>
-            </div>
-            <div className="mt-1 h-2.5 w-full overflow-hidden rounded bg-black/40">
-              <div className="h-full" style={{ width: (h.rankUpAvailable ? 100 : gxpPct) + "%", backgroundColor: h.rankUpAvailable ? "#ffcf4d" : "#38e1ff" }} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex justify-between text-[11px] uppercase tracking-widest text-system-text/50"><span>PV</span><span>{h.hp}/{h.maxHp}</span></div>
-            <div className="mt-1 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: hpPct + "%", backgroundColor: hpPct < 30 ? "#ff4d4d" : "#ff7a45" }} /></div>
-          </div>
-          <div className="mt-4 grid grid-cols-4 gap-2 text-center text-sm">
-            <Stat label="Série" value={"🔥 " + h.streak} />
-            <Stat label="Énergie" value={h.mp + "/" + h.maxMp} />
-            <Stat label="Or" value={String(h.gold)} />
-            <Stat label="Méréons" value={"❖ " + (data.mereons ?? 0)} />
-          </div>
-          <p className="mt-3 text-center text-xs text-system-text/60">Puissance totale : <span className="text-system-accent">{data.power}</span>
-            {data.sets && (data.sets.xpPct > 0 || data.sets.goldPct > 0 || data.sets.lootPct > 0) && <span className="ml-2 text-system-text/50">· Panoplies : +{data.sets.xpPct}% XP, +{data.sets.goldPct}% or, +{data.sets.lootPct}% loot</span>}
-          </p>
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        {/* Quêtes du jour avec validation rapide */}
+        <SystemPanel title={"[ Aujourd'hui · " + doneCount + "/" + quests.length + " ]"}>
+          <div className="mb-2 h-1.5 w-full overflow-hidden rounded bg-black/40"><div className="h-full bg-emerald-400" style={{ width: (quests.length ? Math.round((doneCount / quests.length) * 100) : 0) + "%" }} /></div>
+          {remaining.length === 0 ? (
+            <p className="text-sm text-emerald-400">Toutes les quêtes du jour sont validées. L&apos;Ombre est fière. 🐺</p>
+          ) : remaining.map((q) => {
+            const isAuto = q.type === "auto" && q.metricKey && typeof q.threshold === "number";
+            const def = isAuto ? METRIC_BY_KEY[q.metricKey as string] : null;
+            const val = q.todayValue ?? 0;
+            const pct = isAuto ? Math.min(100, Math.round((val / (q.threshold as number)) * 100)) : 0;
+            const a = ATTRIBUTES.find((x) => x.code === q.attributeCodes[0]);
+            return (
+              <div key={q.id} className="flex items-center justify-between gap-2 border-b border-system-border/15 py-2 last:border-0">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">{q.isMandatory ? "★ " : ""}{a ? a.icon + " " : ""}{q.title}</p>
+                  {isAuto ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className="h-1 max-w-[120px] flex-1 overflow-hidden rounded bg-black/40"><div className="h-full bg-system-accent" style={{ width: pct + "%" }} /></div>
+                      <span className="text-[10px] text-system-text/50">{def?.icon} {Math.round(val)}/{Math.round(q.threshold as number)}</span>
+                    </div>
+                  ) : <p className="text-[11px] text-system-text/40">{q.difficulty} · {q.baseXp} XP</p>}
+                </div>
+                {isAuto
+                  ? <span className="shrink-0 text-[10px] uppercase tracking-widest text-system-text/40">auto</span>
+                  : <button onClick={() => complete(q.id)} className="shrink-0 rounded border border-system-border px-2.5 py-1 text-xs uppercase tracking-widest text-system-accent hover:bg-system-accent/10">✓</button>}
+              </div>
+            );
+          })}
+          <Link href="/quetes" className="mt-2 block text-right text-xs text-system-accent hover:underline">Tout voir →</Link>
         </SystemPanel>
 
-        {data.shadow && (
-          <SystemPanel title="[ Ton Ombre ]">
-            <div className="flex items-center gap-4">
-              <ShadowCompanion stageKey={data.shadow.stage.key} fed={data.shadow.fed} size={110} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold" style={{ color: data.shadow.fed ? "#b06bff" : "#5f7285" }}>{data.shadow.stage.name}</p>
-                <p className="text-xs italic text-system-text/60">{data.shadow.stage.desc}</p>
-                <p className="mt-1 text-xs">
-                  {data.shadow.fed
-                    ? <span className="text-emerald-400">Nourrie — elle t&apos;accorde +{data.shadow.stage.xpPct}% XP.</span>
-                    : <span className="text-system-text/50">Assombrie… valide toutes tes quêtes obligatoires pour la nourrir.</span>}
-                </p>
-                {data.shadow.next && (
-                  <div className="mt-2">
-                    <div className="flex justify-between text-[11px] text-system-text/50"><span>Essence : {data.shadow.essence}</span><span>{data.shadow.next.name} à {data.shadow.next.at}</span></div>
-                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: Math.min(100, Math.round((data.shadow.essence / data.shadow.next.at) * 100)) + "%", backgroundColor: "#b06bff" }} /></div>
-                  </div>
-                )}
-              </div>
-            </div>
-            {data.sets && data.sets.active.length > 0 && (
+        <div className="space-y-4">
+          {/* Aventure : objectifs principaux */}
+          <SystemPanel title="[ Aventure en cours ]">
+            {mainObjs.length === 0 && shortObjs.length === 0 && <p className="text-sm text-system-text/60">Aucun objectif actif. Lance l&apos;Assistant dans ⚙ Configuration.</p>}
+            {mainObjs.map((o) => {
+              const a = ATTRIBUTES.find((x) => x.code === o.attributeCode);
+              return (
+                <div key={o.id} className="mb-2.5 last:mb-0">
+                  <div className="flex justify-between text-sm"><span className="truncate font-bold">◆ {o.title}</span><span className="shrink-0 text-xs text-system-text/50">{Math.round(o.frac * 100)}%</span></div>
+                  <div className="mt-1 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: Math.round(o.frac * 100) + "%", backgroundColor: a?.color || "#38e1ff" }} /></div>
+                </div>
+              );
+            })}
+            {shortObjs.length > 0 && (
               <div className="mt-3 border-t border-system-border/20 pt-2">
-                <p className="mb-1 text-[11px] uppercase tracking-widest text-system-text/50">Panoplies portées</p>
-                {data.sets.active.map((s) => (
-                  <p key={s.key} className="text-xs" style={{ color: s.color }}>{s.pieces >= s.total ? "✦ " : "· "}{s.name} <span className="text-system-text/50">{s.pieces}/{s.total}</span></p>
+                <p className="mb-1 text-[11px] uppercase tracking-widest text-system-text/50">Quêtes courtes</p>
+                {shortObjs.map((o) => (
+                  <div key={o.id} className="flex items-center gap-2 py-0.5 text-xs">
+                    <div className="h-1 w-16 shrink-0 overflow-hidden rounded bg-black/40"><div className="h-full bg-system-accent" style={{ width: Math.round(o.frac * 100) + "%" }} /></div>
+                    <span className="truncate text-system-text/70">{o.title}</span>
+                  </div>
                 ))}
               </div>
             )}
+            <Link href="/objectifs" className="mt-2 block text-right text-xs text-system-accent hover:underline">L&apos;Aventure →</Link>
           </SystemPanel>
-        )}
 
-        <SystemPanel title="[ Histoire Principale ]">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {RANKS.map((r, i) => {
-              const cur = i === rankIdx; const done = i < rankIdx;
-              return <span key={r} className="rounded border px-2 py-0.5 text-xs" style={{ borderColor: cur ? "#ffcf4d" : done ? "rgba(56,225,255,.45)" : "rgba(95,114,133,.45)", color: cur ? "#ffcf4d" : done ? "#38e1ff" : "#5f7285", textShadow: cur ? "0 0 8px rgba(255,207,77,.4)" : "none" }}>{r}</span>;
-            })}
-          </div>
-
-          {h.nextRank ? (
-            <div className="mt-3">
-              <p className="text-xs text-system-text/60">Acte en cours : <span className="text-system-accent">{h.rank}</span> → <span style={{ color: "#ffcf4d" }}>{h.nextRank}</span>. Réunis les conditions pour débloquer le Donjon de Changement de Rang.</p>
-
-              <div className="mt-3">
-                <div className="flex justify-between text-xs"><span className={h.levelReady ? "text-emerald-400" : "text-system-text/70"}>{h.levelReady ? "✓" : "○"} Niveau du rang</span><span className="text-system-text/60">{h.globalLevel}/{h.ceiling}</span></div>
-                <div className="mt-1 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: Math.min(100, Math.round((h.globalLevel / h.ceiling) * 100)) + "%", backgroundColor: h.levelReady ? "#48e6a0" : "#38e1ff" }} /></div>
-              </div>
-
-              <div className="mt-3">
-                <div className="flex justify-between text-xs"><span className={h.attrsReady ? "text-emerald-400" : "text-system-text/70"}>{h.attrsReady ? "✓" : "○"} Chaque compétence au niveau {h.attrThreshold}</span><span className="text-system-text/60">{attrsOkCount}/{data.attributes.length}</span></div>
-                <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  {data.attributes.map((a) => {
-                    const ok = a.level >= h.attrThreshold; const pct = Math.min(100, Math.round((a.level / Math.max(1, h.attrThreshold)) * 100));
-                    return (
-                      <div key={a.code} className="flex items-center gap-2">
-                        <span className="w-5 text-xs">{a.icon}</span>
-                        <span className="w-8 text-xs text-system-text/50">{a.code}</span>
-                        <div className="h-1.5 flex-1 overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: pct + "%", backgroundColor: ok ? "#48e6a0" : a.color }} /></div>
-                        <span className="w-9 text-right text-xs" style={{ color: ok ? "#48e6a0" : undefined }}>{ok ? "✓ " : ""}{a.level}</span>
-                      </div>
-                    );
-                  })}
+          {/* Hebdo compact */}
+          <SystemPanel title="[ Missions de la semaine ]">
+            {weeklyActive.length === 0 ? (
+              <p className="text-sm text-system-text/60">{weeklies.length ? "Missions hebdo accomplies ✓" : "Aucune mission cette semaine."}</p>
+            ) : weeklyActive.map((w) => {
+              const done = w.steps.filter((s) => s.done).length;
+              const pct = w.steps.length ? Math.round((done / w.steps.length) * 100) : 0;
+              return (
+                <div key={w.id} className="mb-2 last:mb-0">
+                  <div className="flex justify-between text-sm"><span className="truncate">{w.title}</span><span className="shrink-0 text-xs text-system-text/50">{done}/{w.steps.length}</span></div>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-black/40"><div className="h-full bg-amber-400" style={{ width: pct + "%" }} /></div>
                 </div>
-              </div>
-
-              {h.rankUpAvailable && <Link href="/donjons" className="mt-3 block text-sm text-amber-300 system-glow">⩘ Donjon de Changement de Rang débloqué — entre dans l'onglet Donjons !</Link>}
-            </div>
-          ) : <p className="mt-3 text-xs text-system-text/60">Rang maximal atteint. 👑</p>}
-        </SystemPanel>
-
-        <SystemPanel title="[ Attributs ]">
-          <p className="mb-2 text-xs text-system-text/50">Les attributs sont plafonnés à ton niveau global ({h.globalLevel}). Monte de rang pour les débloquer.</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{data.attributes.map((a) => <AttributeRow key={a.id} a={a} />)}</div>
-        </SystemPanel>
-
-        {data.penalties.length > 0 && (
-          <SystemPanel title="[ Zone de pénalité ]">
-            <ul className="space-y-1 text-xs text-system-text/70">
-              {data.penalties.map((p) => (
-                <li key={p.id} className="flex justify-between gap-2 border-b border-system-border/15 pb-1 last:border-0"><span>{p.date} · {p.reason}</span><span className="shrink-0 text-red-400">-{p.hpLost} PV{p.xpLost ? " · -" + p.xpLost + " XP" : ""}</span></li>
-              ))}
-            </ul>
+              );
+            })}
+            <Link href="/quetes" className="mt-2 block text-right text-xs text-system-accent hover:underline">Cocher les étapes →</Link>
           </SystemPanel>
-        )}
+        </div>
       </div>
-      </div>
-    </div>
-  );
-}
-function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded border border-system-border/30 bg-black/30 py-2"><div className="text-system-accent">{value}</div><div className="text-[11px] uppercase tracking-widest text-system-text/50">{label}</div></div>;
-}
-function AttributeRow({ a }: { a: Attr }) {
-  const pct = a.capped ? 100 : (a.xpNext > 0 ? Math.min(100, Math.round((a.xp / a.xpNext) * 100)) : 0);
-  return (
-    <div className="rounded border border-system-border/30 bg-black/20 p-3">
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-2"><span>{a.icon}</span><span className="text-sm">{a.name}</span></span>
-        <span className="text-sm" style={{ color: a.color }}>Niv. {a.level}{a.capped ? " · MAX" : ""}</span>
-      </div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: pct + "%", backgroundColor: a.capped ? "#ffcf4d" : a.color }} /></div>
-      <div className="mt-1 text-right text-[11px] text-system-text/50">{a.capped ? "plafonné (niv. global " + "atteint)" : a.xp + "/" + a.xpNext + " XP"}</div>
     </div>
   );
 }

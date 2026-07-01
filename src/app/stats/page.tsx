@@ -3,9 +3,20 @@
 import { useEffect, useState } from "react";
 import SystemPanel from "@/components/SystemPanel";
 import LpcItemThumb from "@/components/LpcItemThumb";
-import { TIER_LABEL, TIER_COLOR, type Tier } from "@/lib/achievements";
+import { TIER_LABEL, TIER_COLOR, ACHIEVEMENT_SKINS, type Tier } from "@/lib/achievements";
 import { GRADE_COLOR, type WeekGrade } from "@/lib/weekscore";
+import { SETS } from "@/lib/sets";
+import { COSMETIC_SET } from "@/lib/cosmetics";
+import { TEMPLE_SET } from "@/lib/almanax";
+import { ITEM_BY_KEY, RARITY_COLORS, type Rarity } from "@/lib/lpc-items";
 import { playLevelUp, setSfxEnabled } from "@/lib/sfx";
+
+function sourceOf(key: string): { label: string; color: string } {
+  if (COSMETIC_SET.has(key)) return { label: "✦ Éclats", color: "#b06bff" };
+  if (ACHIEVEMENT_SKINS.has(key)) return { label: "🏆 Succès", color: "#ffcf4d" };
+  if (TEMPLE_SET.has(key)) return { label: "❖ Temple", color: "#ffcf4d" };
+  return { label: "🎲 Butin", color: "#4d9bff" };
+}
 
 type Pt = { day: string; xp: number; done: number; failed: number };
 type Attr = { code: string; name: string; color: string; level: number };
@@ -26,14 +37,17 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [weeks, setWeeks] = useState<WeekRow[]>([]);
   const [bestWeek, setBestWeek] = useState(0);
+  const [owned, setOwned] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     Promise.all([
       fetch("/api/history").then((r) => r.json()),
       fetch("/api/achievements").then((r) => r.json()),
       fetch("/api/weekscore").then((r) => r.json()).catch(() => null),
-    ]).then(([h, a, w]) => {
+      fetch("/api/inventory").then((r) => r.json()).catch(() => null),
+    ]).then(([h, a, w, inv]) => {
       if (w && !w.error) { setWeeks(w.scores || []); setBestWeek(w.best || 0); }
+      if (inv && !inv.error) setOwned(new Set((inv.items || []).map((i: { itemKey: string }) => i.itemKey)));
       setSeries(h.series || []);
       setAttrs(h.attributes || []);
       setAchs(a.achievements || []);
@@ -118,6 +132,47 @@ export default function StatsPage() {
           ))}
         </div>
       </SystemPanel>
+      </div>
+
+      <div className="flex items-baseline justify-between px-1">
+        <h2 className="text-sm uppercase tracking-[0.2em] text-system-accent/80">Collections — Panoplies</h2>
+        <span className="text-xs text-system-text/60">{SETS.filter((s) => s.items.every((k) => owned.has(k))).length}/{SETS.length} complètes</span>
+      </div>
+
+      <div className="cards">
+        {SETS.map((s) => {
+          const got = s.items.filter((k) => owned.has(k)).length;
+          const full = got >= s.items.length;
+          return (
+            <SystemPanel key={s.key} title={"[ " + s.name + " · " + got + "/" + s.items.length + " ]"}>
+              <p className="mb-2 text-xs italic text-system-text/50">« {s.lore} »</p>
+              <div className="grid grid-cols-2 gap-2">
+                {s.items.map((k) => {
+                  const it = ITEM_BY_KEY[k];
+                  const has = owned.has(k);
+                  const src = sourceOf(k);
+                  return (
+                    <div key={k} className="flex items-center gap-2 rounded border bg-black/20 p-2" style={{ borderColor: has ? (RARITY_COLORS[(it?.rarity || "rare") as Rarity] + "88") : "rgba(95,114,133,0.3)", opacity: has ? 1 : 0.45 }}>
+                      <div className="shrink-0 rounded bg-black/40" style={{ filter: has ? "none" : "grayscale(1) brightness(0.6)" }}><LpcItemThumb itemKey={k} size={44} /></div>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs" style={{ color: has ? RARITY_COLORS[(it?.rarity || "rare") as Rarity] : undefined }}>{it?.name || k}{has ? " ✓" : ""}</p>
+                        <p className="text-[10px]" style={{ color: src.color }}>{src.label}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-2 border-t border-system-border/20 pt-2">
+                {s.tiers.map((t) => (
+                  <p key={t.pieces} className={"text-[11px] " + (got >= t.pieces ? "" : "opacity-40")} style={{ color: got >= t.pieces ? s.color : undefined }}>
+                    {got >= t.pieces ? "✓" : "○"} {t.pieces} pièces équipées : {[t.xpPct ? "+" + t.xpPct + "% XP" : "", t.goldPct ? "+" + t.goldPct + "% or" : "", t.lootPct ? "+" + t.lootPct + "% loot" : ""].filter(Boolean).join(" · ")}
+                  </p>
+                ))}
+                {full && <p className="mt-1 text-[11px]" style={{ color: s.color }}>✦ Panoplie complète — aura débloquée sur l&apos;avatar</p>}
+              </div>
+            </SystemPanel>
+          );
+        })}
       </div>
 
       <div className="flex items-baseline justify-between px-1">
