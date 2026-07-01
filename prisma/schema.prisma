@@ -192,5 +192,10 @@ model Objective {
   description   String   @default("")
   status        String   @default("active")
   targetCount   Int      @default(10)
+  kind          String   @default("count")
+  metricUnit    String?
+  startValue    Float?
+  targetValue   Float?
+  currentValue  Float?
   createdAt     DateTime @default(now())
 }

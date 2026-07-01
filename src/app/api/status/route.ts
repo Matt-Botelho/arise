@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { totalPower, isExhausted, xpForLevel } from "@/lib/game";
-import { rankCeiling, nextRank, rankUpAvailable, globalXpForLevel } from "@/lib/progression";
+import { rankCeiling, nextRank, rankUpGate, globalXpForLevel } from "@/lib/progression";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,8 @@ export async function GET() {
 
   const ceiling = rankCeiling(hunter.rank);
   const target = nextRank(hunter.rank);
-  const canRankUp = rankUpAvailable(hunter.globalLevel, hunter.rank);
+  const minAttrLevel = hunter.attributes.length ? Math.min(...hunter.attributes.map((a) => a.level)) : 0;
+  const gate = rankUpGate(hunter.globalLevel, hunter.rank, minAttrLevel);
 
   const penalties = await prisma.penalty.findMany({ where: { hunterId: hunter.id }, orderBy: { createdAt: "desc" }, take: 5 });
 
@@ -32,7 +33,7 @@ export async function GET() {
     hunter: {
       name: hunter.name, rank: hunter.rank,
       globalLevel: hunter.globalLevel, globalXp: hunter.globalXp, globalXpNext: globalXpForLevel(hunter.globalLevel),
-      ceiling, nextRank: target, rankUpAvailable: canRankUp,
+      ceiling, nextRank: target, rankUpAvailable: gate.ready, attrThreshold: gate.threshold, minAttrLevel, levelReady: gate.levelOk, attrsReady: gate.attrsOk,
       hp: hunter.hp, maxHp: hunter.maxHp, mp: hunter.mp, maxMp: hunter.maxMp,
       gold: hunter.gold, title: hunter.title, streak: hunter.streak, exhausted: isExhausted(hunter.hp), onboarded: hunter.onboarded,
     },

@@ -10,7 +10,7 @@ type Penalty = { id: string; date: string; reason: string; hpLost: number; xpLos
 type Status = {
   hunter: {
     name: string; rank: string; globalLevel: number; globalXp: number; globalXpNext: number;
-    ceiling: number; nextRank: string | null; rankUpAvailable: boolean;
+    ceiling: number; nextRank: string | null; rankUpAvailable: boolean; attrThreshold: number; minAttrLevel: number; levelReady: boolean; attrsReady: boolean;
     hp: number; maxHp: number; mp: number; maxMp: number; gold: number; title: string; streak: number; exhausted: boolean; onboarded: boolean;
   };
   attributes: Attr[]; power: number; penalties: Penalty[];
@@ -88,7 +88,13 @@ export default function StatutPage() {
           {h.rankUpAvailable
             ? <Link href="/donjons" className="mt-2 block text-sm text-amber-300 system-glow">⩘ Donjon de Changement de Rang débloqué — entre dans l'onglet Donjons !</Link>
             : h.nextRank
-              ? <p className="mt-2 text-xs text-system-text/60">Atteins le niveau {h.ceiling} pour débloquer le Donjon de Rang ({h.rank} → {h.nextRank}).</p>
+              ? (
+                <div className="mt-2 text-xs text-system-text/60">
+                  <p>Pour débloquer le Donjon de Rang ({h.rank} → {h.nextRank}) :</p>
+                  <p className={h.levelReady ? "text-emerald-400" : ""}>{h.levelReady ? "✓" : "○"} Niveau {h.ceiling} (actuel {h.globalLevel})</p>
+                  <p className={h.attrsReady ? "text-emerald-400" : ""}>{h.attrsReady ? "✓" : "○"} Chaque attribut ≥ {h.attrThreshold} (min {h.minAttrLevel})</p>
+                </div>
+              )
               : <p className="mt-2 text-xs text-system-text/60">Rang maximal atteint. 👑</p>}
         </SystemPanel>
 

@@ -42,6 +42,18 @@ export function rankUpAvailable(globalLevel: number, rank: string): boolean {
   return globalLevel >= rankCeiling(rank) && nextRank(rank) !== null;
 }
 
+// Seuil d'attribut requis pour monter de rang = moitié du plafond du rang.
+export function attrThresholdFor(rank: string): number { return Math.ceil(rankCeiling(rank) / 2); }
+
+// Gate complet : niveau plafond atteint ET chaque attribut au moins à la moitié du plafond.
+export function rankUpGate(globalLevel: number, rank: string, minAttrLevel: number) {
+  const next = nextRank(rank);
+  const threshold = attrThresholdFor(rank);
+  const levelOk = globalLevel >= rankCeiling(rank);
+  const attrsOk = minAttrLevel >= threshold;
+  return { levelOk, attrsOk, threshold, ready: !!next && levelOk && attrsOk };
+}
+
 // Thème de la quête obligatoire selon le jour (0=dim..6=sam), réglable.
 export const DEFAULT_DAY_THEME: Record<number, string> = {
   1: "FOR", 2: "VIT", 3: "VOL", 4: "FIN", 5: "INT", 6: "TRA", 0: "FAM",

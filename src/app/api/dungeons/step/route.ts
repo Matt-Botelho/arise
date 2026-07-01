@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { applyAttrXp, rankCeiling, rankIndex } from "@/lib/progression";
+import { applyAttrXp, rankCeiling, rankIndex, attrThresholdFor } from "@/lib/progression";
 import { pickRankLoot } from "@/lib/loot";
 import { RANK_TITLES, RANK_INTRO } from "@/lib/ranks-lore";
 import { dungeonProgress, type DungeonStep } from "@/lib/achievements";
@@ -15,8 +15,15 @@ export async function POST(req: Request) {
   const hunter = await prisma.hunter.findUnique({ where: { id: dungeon.hunterId }, include: { attributes: true } });
   if (!hunter) return NextResponse.json({ error: "Chasseur introuvable" }, { status: 404 });
 
-  if (dungeon.isRankUp && hunter.globalLevel < rankCeiling(hunter.rank)) {
-    return NextResponse.json({ error: "Donjon verrouillé : atteins le niveau " + rankCeiling(hunter.rank) + " (max du rang " + hunter.rank + ") pour l'affronter." }, { status: 423 });
+  if (dungeon.isRankUp) {
+    if (hunter.globalLevel < rankCeiling(hunter.rank)) {
+      return NextResponse.json({ error: "Donjon verrouillé : atteins le niveau " + rankCeiling(hunter.rank) + " (max du rang " + hunter.rank + ") pour l'affronter." }, { status: 423 });
+    }
+    const minAttr = hunter.attributes.length ? Math.min(...hunter.attributes.map((a) => a.level)) : 0;
+    const th = attrThresholdFor(hunter.rank);
+    if (minAttr < th) {
+      return NextResponse.json({ error: "Donjon verrouillé : chaque attribut doit atteindre le niveau " + th + " (moitié du palier). Le plus bas est au niveau " + minAttr + "." }, { status: 423 });
+    }
   }
 
   const steps: DungeonStep[] = JSON.parse(dungeon.stepsJson || "[]");

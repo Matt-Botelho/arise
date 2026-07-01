@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   let objective: { id: string; title: string; progress: number; target: number; justCompleted: boolean } | null = null;
   if (quest.objectiveId) {
     const obj = await prisma.objective.findUnique({ where: { id: quest.objectiveId } });
-    if (obj) {
+    if (obj && obj.kind !== "metric") {
       const linked = await prisma.quest.findMany({ where: { objectiveId: obj.id }, select: { id: true } });
       const progress = await prisma.questLog.count({ where: { status: "done", questId: { in: linked.map((q) => q.id) } } });
       const justCompleted = obj.status !== "done" && progress >= obj.targetCount;
