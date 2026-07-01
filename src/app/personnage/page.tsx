@@ -56,7 +56,7 @@ export default function PersonnagePage() {
         <div className="space-y-3 md:sticky md:top-2 md:self-start">
           <SystemPanel title="[ Aperçu ]">
             <div className="flex justify-center"><LpcAvatar equipped={preview} size={300} /></div>
-            {hover && <p className="mt-1 text-center text-[11px] text-system-accent/80">Aperçu — clique pour équiper</p>}
+            {hover && <p className="mt-1 text-center text-xs text-system-accent/80">Aperçu — clique pour équiper</p>}
           </SystemPanel>
 
           <SystemPanel title="[ Équipé ]">
@@ -76,9 +76,9 @@ export default function PersonnagePage() {
 
           <SystemPanel title="[ Bonus d'équipement ]">
             <div className="grid grid-cols-3 gap-2 text-center text-sm">
-              <div className="rounded border border-system-border/30 bg-black/30 py-2"><div className="text-system-accent">+{bonuses.xpPct}%</div><div className="text-[10px] uppercase tracking-widest text-system-text/50">XP</div></div>
-              <div className="rounded border border-system-border/30 bg-black/30 py-2"><div style={{ color: "#ffcf4d" }}>+{bonuses.goldPct}%</div><div className="text-[10px] uppercase tracking-widest text-system-text/50">Or</div></div>
-              <div className="rounded border border-system-border/30 bg-black/30 py-2"><div style={{ color: "#b06bff" }}>+{bonuses.lootPct}%</div><div className="text-[10px] uppercase tracking-widest text-system-text/50">Loot</div></div>
+              <div className="rounded border border-system-border/30 bg-black/30 py-2"><div className="text-system-accent">+{bonuses.xpPct}%</div><div className="text-[11px] uppercase tracking-widest text-system-text/50">XP</div></div>
+              <div className="rounded border border-system-border/30 bg-black/30 py-2"><div style={{ color: "#ffcf4d" }}>+{bonuses.goldPct}%</div><div className="text-[11px] uppercase tracking-widest text-system-text/50">Or</div></div>
+              <div className="rounded border border-system-border/30 bg-black/30 py-2"><div style={{ color: "#b06bff" }}>+{bonuses.lootPct}%</div><div className="text-[11px] uppercase tracking-widest text-system-text/50">Loot</div></div>
             </div>
           </SystemPanel>
         </div>
@@ -91,7 +91,7 @@ export default function PersonnagePage() {
               const active = slot === activeSlot;
               return (
                 <button key={slot} onClick={() => { setActiveSlot(slot); setHover(null); }}
-                  className={"shrink-0 rounded border px-3 py-2 text-[11px] uppercase tracking-widest " + (active ? "border-system-accent text-system-accent" : "border-system-border/40 text-system-text/60 hover:text-system-accent")}>
+                  className={"shrink-0 rounded border px-3 py-2 text-xs uppercase tracking-widest " + (active ? "border-system-accent text-system-accent" : "border-system-border/40 text-system-text/60 hover:text-system-accent")}>
                   {SLOT_LABEL[slot]} <span className="opacity-50">{nb}</span>
                 </button>
               );
@@ -101,7 +101,7 @@ export default function PersonnagePage() {
           <SystemPanel title={"[ " + SLOT_LABEL[activeSlot] + " ]"}>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
               <button onClick={() => equip(activeSlot, null)}
-                className={"flex aspect-square flex-col items-center justify-center gap-1 rounded border text-[10px] " + (!cur ? "border-system-accent text-system-accent" : "border-system-border/30 text-system-text/40 hover:border-system-accent/50")}>
+                className={"flex aspect-square flex-col items-center justify-center gap-1 rounded border text-[11px] " + (!cur ? "border-system-accent text-system-accent" : "border-system-border/30 text-system-text/40 hover:border-system-accent/50")}>
                 <span className="text-lg leading-none">✕</span>Aucun
               </button>
               {list.map((it) => {
@@ -116,8 +116,8 @@ export default function PersonnagePage() {
                     className="relative flex flex-col items-center rounded border bg-black/30 p-1"
                     style={{ borderColor: selected ? RARITY_COLORS[it.rarity] : "rgba(31,111,235,0.25)", borderWidth: selected ? 2 : 1 }}>
                     <LpcItemThumb itemKey={it.key} color={col} size={62} />
-                    <span className="mt-0.5 w-full truncate text-center text-[9px]" style={{ color: RARITY_COLORS[it.rarity] }}>{it.name}</span>
-                    {pl > 0 && <span className="absolute right-0.5 top-0.5 rounded bg-black/70 px-1 text-[9px] text-system-accent">+{pl}</span>}
+                    <span className="mt-0.5 w-full truncate text-center text-[10px]" style={{ color: RARITY_COLORS[it.rarity] }}>{it.name}</span>
+                    {pl > 0 && <span className="absolute right-0.5 top-0.5 rounded bg-black/70 px-1 text-[10px] text-system-accent">+{pl}</span>}
                   </button>
                 );
               })}
@@ -126,7 +126,7 @@ export default function PersonnagePage() {
 
             {curItem?.colors && curItem.colors.length > 1 && (
               <div className="mt-3">
-                <p className="mb-1 text-[10px] uppercase tracking-widest text-system-text/50">Couleur — {curItem.name} ({RARITY_LABEL[curItem.rarity as Rarity]})</p>
+                <p className="mb-1 text-[11px] uppercase tracking-widest text-system-text/50">Couleur — {curItem.name} ({RARITY_LABEL[curItem.rarity as Rarity]})</p>
                 <div className="flex flex-wrap gap-1">
                   {curItem.colors.map((c) => (
                     <button key={c.name} title={c.name} onClick={() => equip(activeSlot, curItem.key, c.name)}
@@ -137,7 +137,7 @@ export default function PersonnagePage() {
               </div>
             )}
           </SystemPanel>
-          <p className="text-[11px] text-system-text/40">Survole une pièce pour la voir sur ton personnage, clique pour l'équiper. Améliore tes pièces dans Boutique → Atelier.</p>
+          <p className="text-xs text-system-text/40">Survole une pièce pour la voir sur ton personnage, clique pour l'équiper. Améliore tes pièces dans Boutique → Atelier.</p>
         </div>
       </div>
     </div>

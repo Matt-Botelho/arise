@@ -50,7 +50,7 @@ export default function StatutPage() {
               <span className="text-4xl font-black text-system-accent system-glow">{h.rank}</span>
               <span className="mb-1 text-sm text-system-text/70">Niv. {h.globalLevel}</span>
             </div>
-            {h.exhausted && <span className="mt-1 rounded border border-red-500/60 px-2 py-0.5 text-[10px] uppercase tracking-widest text-red-400">⚠ Épuisé</span>}
+            {h.exhausted && <span className="mt-1 rounded border border-red-500/60 px-2 py-0.5 text-[11px] uppercase tracking-widest text-red-400">⚠ Épuisé</span>}
             <Link href="/personnage" className="mt-3 rounded border border-system-border px-3 py-1 text-xs uppercase tracking-widest text-system-accent hover:bg-system-accent/10">Personnaliser →</Link>
           </div>
         </SystemPanel>
@@ -59,7 +59,7 @@ export default function StatutPage() {
       <div className="space-y-4">
         <SystemPanel title="[ Fenêtre de Statut ]">
           <div>
-            <div className="flex justify-between text-[10px] uppercase tracking-widest text-system-text/50">
+            <div className="flex justify-between text-[11px] uppercase tracking-widest text-system-text/50">
               <span>Niveau {h.globalLevel} / 100</span>
               <span>{h.rankUpAvailable ? "PALIER ATTEINT" : h.globalXp + " / " + h.globalXpNext + " XP"}</span>
             </div>
@@ -68,7 +68,7 @@ export default function StatutPage() {
             </div>
           </div>
           <div className="mt-3">
-            <div className="flex justify-between text-[10px] uppercase tracking-widest text-system-text/50"><span>PV</span><span>{h.hp}/{h.maxHp}</span></div>
+            <div className="flex justify-between text-[11px] uppercase tracking-widest text-system-text/50"><span>PV</span><span>{h.hp}/{h.maxHp}</span></div>
             <div className="mt-1 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: hpPct + "%", backgroundColor: hpPct < 30 ? "#ff4d4d" : "#ff7a45" }} /></div>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-3 text-center text-sm">
@@ -93,7 +93,7 @@ export default function StatutPage() {
         </SystemPanel>
 
         <SystemPanel title="[ Attributs ]">
-          <p className="mb-2 text-[11px] text-system-text/50">Les attributs sont plafonnés à ton niveau global ({h.globalLevel}). Monte de rang pour les débloquer.</p>
+          <p className="mb-2 text-xs text-system-text/50">Les attributs sont plafonnés à ton niveau global ({h.globalLevel}). Monte de rang pour les débloquer.</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{data.attributes.map((a) => <AttributeRow key={a.id} a={a} />)}</div>
         </SystemPanel>
 
@@ -112,7 +112,7 @@ export default function StatutPage() {
   );
 }
 function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded border border-system-border/30 bg-black/30 py-2"><div className="text-system-accent">{value}</div><div className="text-[10px] uppercase tracking-widest text-system-text/50">{label}</div></div>;
+  return <div className="rounded border border-system-border/30 bg-black/30 py-2"><div className="text-system-accent">{value}</div><div className="text-[11px] uppercase tracking-widest text-system-text/50">{label}</div></div>;
 }
 function AttributeRow({ a }: { a: Attr }) {
   const pct = a.capped ? 100 : (a.xpNext > 0 ? Math.min(100, Math.round((a.xp / a.xpNext) * 100)) : 0);
@@ -123,7 +123,7 @@ function AttributeRow({ a }: { a: Attr }) {
         <span className="text-sm" style={{ color: a.color }}>Niv. {a.level}{a.capped ? " · MAX" : ""}</span>
       </div>
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: pct + "%", backgroundColor: a.capped ? "#ffcf4d" : a.color }} /></div>
-      <div className="mt-1 text-right text-[10px] text-system-text/50">{a.capped ? "plafonné (niv. global " + "atteint)" : a.xp + "/" + a.xpNext + " XP"}</div>
+      <div className="mt-1 text-right text-[11px] text-system-text/50">{a.capped ? "plafonné (niv. global " + "atteint)" : a.xp + "/" + a.xpNext + " XP"}</div>
     </div>
   );
 }

@@ -82,7 +82,7 @@ export default function OnboardingPage() {
                   {sug.map((t, i) => (
                     <label key={i} className="flex cursor-pointer items-center gap-2 text-sm">
                       <input type="checkbox" checked={d.sel.includes(i)} onChange={() => toggleSel(a.code, i)} />
-                      <span>{t.title} <span className="text-[11px] text-system-text/40">· {t.baseXp} XP</span></span>
+                      <span>{t.title} <span className="text-xs text-system-text/40">· {t.baseXp} XP</span></span>
                     </label>
                   ))}
                 </div>

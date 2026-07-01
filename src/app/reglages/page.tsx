@@ -87,7 +87,7 @@ export default function ReglagesPage() {
             Tester
           </button>
         </div>
-        <p className="mt-2 text-[11px] text-system-text/40">Sur iPhone : ajoute d'abord l'app à l'écran d'accueil (Partager → Sur l'écran d'accueil), puis active.</p>
+        <p className="mt-2 text-xs text-system-text/40">Sur iPhone : ajoute d'abord l'app à l'écran d'accueil (Partager → Sur l'écran d'accueil), puis active.</p>
       </SystemPanel>
 
       <SystemPanel title="[ Chasseur ]">
@@ -129,7 +129,7 @@ export default function ReglagesPage() {
       </SystemPanel>
 
       <SystemPanel title="[ Thème du jour (quête obligatoire) ]">
-        <p className="mb-2 text-[11px] text-system-text/40">L'attribut mis en avant chaque jour dans l'onglet Quêtes.</p>
+        <p className="mb-2 text-xs text-system-text/40">L'attribut mis en avant chaque jour dans l'onglet Quêtes.</p>
         <div className="space-y-2">
           {WEEKDAYS.map((d) => (
             <label key={d.k} className="flex items-center justify-between gap-2 text-sm">
