@@ -24,3 +24,13 @@ export function weekKeyOf(day: string): string {
   const dd = String(dt.getUTCDate()).padStart(2, "0");
   return dt.getUTCFullYear() + "-" + mm + "-" + dd;
 }
+
+// Cle de mois (YYYY-MM) a partir d'un jour de jeu.
+export function monthKeyOf(day: string): string { return day.slice(0, 7); }
+
+// Cle de periode selon la recurrence d'un objectif checklist.
+export function periodKeyFor(recurrence: string, day: string): string {
+  if (recurrence === "week") return "W" + weekKeyOf(day);
+  if (recurrence === "month") return "M" + monthKeyOf(day);
+  return "once";
+}

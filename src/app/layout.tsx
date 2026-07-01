@@ -13,7 +13,7 @@ export const viewport: Viewport = { themeColor: "#05080f" };
 const links: [string, string][] = [
   ["/", "Statut"],
   ["/quetes", "Quêtes"],
-  ["/objectifs", "Objectifs"],
+  ["/objectifs", "Aventure"],
   ["/donjons", "Donjons"],
   ["/boutique", "Boutique"],
   ["/stats", "Stats"],

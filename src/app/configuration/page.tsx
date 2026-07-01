@@ -11,7 +11,7 @@ type Quest = { id: string; title: string; attributeCodes: string[]; baseXp: numb
 type Step = { label: string; done: boolean };
 type Weekly = { id: string; title: string; steps: Step[]; attributeCodes: string[]; baseXp: number; status: string };
 type OQ = { id: string; title: string; baseXp: number; difficulty: string };
-type Obj = { id: string; attributeCode: string; horizon: string; title: string; status: string; progress: number; targetCount: number; kind: string; metricUnit: string | null; startValue: number | null; targetValue: number | null; currentValue: number | null; quests: OQ[] };
+type Obj = { id: string; parentId: string | null; attributeCode: string; horizon: string; title: string; status: string; progress: number; targetCount: number; kind: string; recurrence: string; steps: { label: string; done: boolean }[] | null; metricUnit: string | null; startValue: number | null; targetValue: number | null; currentValue: number | null; quests: OQ[] };
 type Dungeon = { id: string; title: string; rank: string; steps: Step[]; isRankUp: boolean; targetRank: string | null };
 type Reward = { id: string; title: string; cost: number; icon?: string };
 type HInfo = { rank: string; nextRank: string | null };
@@ -62,7 +62,8 @@ export default function ConfigurationPage() {
   const [qTitle, setQTitle] = useState(""); const [qCodes, setQCodes] = useState<string[]>([]); const [qDiff, setQDiff] = useState("E"); const [qXp, setQXp] = useState(50); const [qMand, setQMand] = useState(false);
   const [wTitle, setWTitle] = useState(""); const [wSteps, setWSteps] = useState(""); const [wCodes, setWCodes] = useState<string[]>([]); const [wXp, setWXp] = useState(400);
   const [oCode, setOCode] = useState(CODES[0]); const [oHorizon, setOHorizon] = useState("court"); const [oTitle, setOTitle] = useState(""); const [oTarget, setOTarget] = useState(10);
-  const [oKind, setOKind] = useState<"count" | "metric">("count"); const [oUnit, setOUnit] = useState("kg"); const [oStart, setOStart] = useState(0); const [oTargetV, setOTargetV] = useState(0);
+  const [oKind, setOKind] = useState<"count" | "metric" | "checklist">("count"); const [oUnit, setOUnit] = useState("kg"); const [oStart, setOStart] = useState(0); const [oTargetV, setOTargetV] = useState(0);
+  const [oParent, setOParent] = useState(""); const [oRecur, setORecur] = useState<"once" | "week" | "month">("once"); const [oSteps, setOSteps] = useState("");
   const [openAdd, setOpenAdd] = useState<string | null>(null); const [customQ, setCustomQ] = useState("");
   const [dTitle, setDTitle] = useState(""); const [dRankUp, setDRankUp] = useState(true); const [dRank, setDRank] = useState("D"); const [dSteps, setDSteps] = useState(""); const [dCodes, setDCodes] = useState<string[]>([]); const [dReward, setDReward] = useState(400);
   const [rTitle, setRTitle] = useState(""); const [rCost, setRCost] = useState(100); const [rIcon, setRIcon] = useState("🎁");
@@ -108,10 +109,12 @@ export default function ConfigurationPage() {
 
   async function createObj() {
     if (!oTitle.trim()) return;
-    const body: Record<string, unknown> = { attributeCode: oCode, horizon: oHorizon, title: oTitle, kind: oKind };
-    if (oKind === "count") body.targetCount = oTarget; else { body.metricUnit = oUnit; body.startValue = oStart; body.targetValue = oTargetV; }
+    const body: Record<string, unknown> = { attributeCode: oCode, horizon: oHorizon, title: oTitle, kind: oKind, parentId: oParent || null };
+    if (oKind === "count") body.targetCount = oTarget;
+    else if (oKind === "metric") { body.metricUnit = oUnit; body.startValue = oStart; body.targetValue = oTargetV; }
+    else { body.recurrence = oRecur; body.steps = oSteps.split("\n").map((x) => x.trim()).filter(Boolean); }
     const r = await fetch("/api/objectives", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((x) => x.json());
-    if (r.ok) { setOTitle(""); setOTarget(10); setOStart(0); setOTargetV(0); flash("Objectif créé ✓"); load(); } else flash(r.error || "Erreur");
+    if (r.ok) { setOTitle(""); setOTarget(10); setOStart(0); setOTargetV(0); setOSteps(""); flash("Objectif créé ✓"); load(); } else flash(r.error || "Erreur");
   }
   async function delObj(id: string) { await fetch("/api/objectives", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); load(); }
   async function setTarget(o: Obj, n: number) { if (n < 1) return; await fetch("/api/objectives", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, targetCount: n }) }); load(); }
@@ -241,40 +244,56 @@ export default function ConfigurationPage() {
       {tab === "objectifs" && (
         <div className="cards">
           <SystemPanel title="[ Nouvel objectif ]">
-            <div className="flex flex-wrap gap-2">
+            <label className="block text-xs uppercase tracking-widest text-system-text/60">Rattacher à (parent)</label>
+            <select className={"mt-1 " + inputCls} value={oParent} onChange={(e) => setOParent(e.target.value)}>
+              <option value="">— aucun (racine / Quête Principale) —</option>
+              {objs.map((p) => <option key={p.id} value={p.id}>{(p.horizon === "long" ? "◆ " : p.horizon === "moyen" ? "▸ " : "· ") + p.title}</option>)}
+            </select>
+            <div className="mt-2 flex flex-wrap gap-2">
               <select className="rounded border border-system-border/40 bg-black/40 px-2 py-2 text-sm outline-none" value={oCode} onChange={(e) => setOCode(e.target.value)}>{ATTRIBUTES.map((a) => <option key={a.code} value={a.code}>{a.name}</option>)}</select>
-              <select className="rounded border border-system-border/40 bg-black/40 px-2 py-2 text-sm outline-none" value={oHorizon} onChange={(e) => setOHorizon(e.target.value)}><option value="court">Court terme</option><option value="moyen">Moyen terme</option></select>
+              <select className="rounded border border-system-border/40 bg-black/40 px-2 py-2 text-sm outline-none" value={oHorizon} onChange={(e) => setOHorizon(e.target.value)}><option value="long">Long terme (Principale)</option><option value="moyen">Moyen terme (Chapitre)</option><option value="court">Court terme (Quête)</option></select>
             </div>
-            <input className={"mt-2 " + inputCls} placeholder="Intitulé de l'objectif" value={oTitle} onChange={(e) => setOTitle(e.target.value)} />
+            <input className={"mt-2 " + inputCls} placeholder="Intitulé" value={oTitle} onChange={(e) => setOTitle(e.target.value)} />
             <div className="mt-2 flex gap-2">
               <button onClick={() => setOKind("count")} className={"flex-1 " + chip(oKind === "count")}>Compteur</button>
               <button onClick={() => setOKind("metric")} className={"flex-1 " + chip(oKind === "metric")}>Métrique</button>
+              <button onClick={() => setOKind("checklist")} className={"flex-1 " + chip(oKind === "checklist")}>Checklist</button>
             </div>
-            {oKind === "count" ? (
+            {oKind === "count" && (
               <label className="mt-2 flex items-center gap-1 text-xs text-system-text/60">Cible (nb de fois) <input type="number" min={1} className="w-16 rounded border border-system-border/40 bg-black/40 px-2 py-2 text-sm outline-none" value={oTarget} onChange={(e) => setOTarget(Math.max(1, parseInt(e.target.value || "1", 10)))} /></label>
-            ) : (
+            )}
+            {oKind === "metric" && (
               <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-system-text/60">
                 <label>Départ<input type="number" className={inputCls} value={oStart} onChange={(e) => setOStart(parseFloat(e.target.value || "0"))} /></label>
                 <label>Cible<input type="number" className={inputCls} value={oTargetV} onChange={(e) => setOTargetV(parseFloat(e.target.value || "0"))} /></label>
                 <label>Unité<input className={inputCls} value={oUnit} onChange={(e) => setOUnit(e.target.value)} /></label>
               </div>
             )}
-            <button onClick={createObj} className={"mt-2 w-full " + btnCls}>Ajouter l'objectif</button>
+            {oKind === "checklist" && (
+              <div className="mt-2">
+                <div className="flex items-center gap-2"><span className="text-xs text-system-text/60">Récurrence</span>
+                  <select className="rounded border border-system-border/40 bg-black/40 px-2 py-1 text-sm outline-none" value={oRecur} onChange={(e) => setORecur(e.target.value as "once" | "week" | "month")}><option value="once">Une fois</option><option value="week">Hebdo</option><option value="month">Mensuel</option></select>
+                </div>
+                <textarea className={"mt-2 h-20 " + inputCls} placeholder={"Étape 1\nÉtape 2\nÉtape 3"} value={oSteps} onChange={(e) => setOSteps(e.target.value)} />
+              </div>
+            )}
+            <button onClick={createObj} className={"mt-2 w-full " + btnCls}>Ajouter</button>
           </SystemPanel>
 
           {objs.map((o) => {
             const a = ATTRIBUTES.find((x) => x.code === o.attributeCode);
             const sug = SUGGESTIONS[o.attributeCode] || [];
             const metric = o.kind === "metric";
+            const parent = o.parentId ? objs.find((p) => p.id === o.parentId) : null;
             return (
               <SystemPanel key={o.id} title={"[ " + (a ? a.icon + " " + a.name : o.attributeCode) + " ]"}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className={"text-sm font-bold " + (o.status === "done" ? "text-emerald-400 line-through" : "")}>{o.title}</p>
-                    <p className="text-xs text-system-text/50">{o.horizon === "moyen" ? "Moyen terme" : "Court terme"} · {metric ? (o.currentValue ?? o.startValue ?? 0) + " → " + (o.targetValue ?? 0) + " " + (o.metricUnit || "") : o.progress + "/" + o.targetCount}</p>
+                    <p className={"text-sm font-bold " + (o.status === "done" ? "text-emerald-400 line-through" : "")}>{(o.horizon === "long" ? "◆ " : o.horizon === "moyen" ? "▸ " : "") + o.title}</p>
+                    <p className="text-xs text-system-text/50">{o.horizon === "long" ? "Principale" : o.horizon === "moyen" ? "Chapitre" : "Quête"}{parent ? " · ↳ " + parent.title : ""} · {o.kind === "metric" ? (o.currentValue ?? o.startValue ?? 0) + " → " + (o.targetValue ?? 0) + " " + (o.metricUnit || "") : o.kind === "checklist" ? "checklist" + (o.recurrence !== "once" ? " " + o.recurrence : "") : o.progress + "/" + o.targetCount}</p>
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    {!metric && <><button onClick={() => setTarget(o, o.targetCount - 1)} className="rounded border border-system-border/40 px-1.5 text-sm hover:border-system-accent">−</button><button onClick={() => setTarget(o, o.targetCount + 1)} className="rounded border border-system-border/40 px-1.5 text-sm hover:border-system-accent">+</button></>}
+                    {o.kind === "count" && <><button onClick={() => setTarget(o, o.targetCount - 1)} className="rounded border border-system-border/40 px-1.5 text-sm hover:border-system-accent">−</button><button onClick={() => setTarget(o, o.targetCount + 1)} className="rounded border border-system-border/40 px-1.5 text-sm hover:border-system-accent">+</button></>}
                     <button onClick={() => toggleObjDone(o)} className="rounded border border-emerald-500/40 px-2 py-1 text-xs text-emerald-400 hover:bg-emerald-500/10">✓</button>
                     <button onClick={() => delObj(o.id)} className="rounded border border-red-500/40 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10">✕</button>
                   </div>

@@ -193,6 +193,14 @@ model Objective {
   status        String   @default("active")
   targetCount   Int      @default(10)
   kind          String   @default("count")
+  baseXp        Int      @default(50)
+  recurrence    String   @default("once")
+  stepsJson     String?
+  periodKey     String?
+  lastRewardKey String?
+  parentId      String?
+  parent        Objective?  @relation("ObjectiveTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Objective[] @relation("ObjectiveTree")
   metricUnit    String?
   startValue    Float?
   targetValue   Float?
