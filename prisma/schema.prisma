@@ -26,6 +26,8 @@ model Hunter {
   penaltyIntensity String   @default("fidele")
   dayRolloverHour  Int      @default(0)
   timezone         String   @default("Europe/Paris")
+  dayThemeJson     String?
+  sfxEnabled       Boolean  @default(true)
   lastRollover     String?
   appearanceJson   String?
   equippedJson     String?

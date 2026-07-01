@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import SystemPanel from "@/components/SystemPanel";
 import { RARITY_LABEL, type Rarity } from "@/lib/lpc-items";
+import { ATTRIBUTES } from "@/lib/game.config";
+import { setSfxEnabled, playXp, playLevelUp, playLoot, playObjective } from "@/lib/sfx";
 
 type Quest = { id: string; title: string; type: string; attributeCodes: string[]; baseXp: number; difficulty: string; isMandatory: boolean; done: boolean };
 type Step = { label: string; done: boolean };
@@ -16,6 +18,9 @@ export default function QuetesPage() {
   const [day, setDay] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [burst, setBurst] = useState<string | null>(null);
+  const [floatXp, setFloatXp] = useState<string | null>(null);
+  const [dayThemeCode, setDayThemeCode] = useState("");
   // form hebdo
   const [wTitle, setWTitle] = useState("");
   const [wSteps, setWSteps] = useState("");
@@ -29,15 +34,26 @@ export default function QuetesPage() {
       fetch("/api/weeklies").then((r) => r.json()),
     ]);
     setQuests(q.quests || []); setDay(q.day || "");
+    setDayThemeCode(q.dayThemeCode || "");
+    setSfxEnabled(q.sfxEnabled !== false);
     setWeeklies(w.weeklies || []);
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
   function flash(m: string, ms = 5000) { setToast(m); setTimeout(() => setToast(null), ms); }
+  function celebrate(r: { gained?: number; globalLeveledUp?: boolean; globalLevel?: number; levelUps?: LevelUp[]; drop?: { rarity: string } | null; objective?: { justCompleted?: boolean } | null }) {
+    if (typeof r.gained === "number") { setFloatXp("+" + r.gained + " XP"); setTimeout(() => setFloatXp(null), 1100); }
+    const leveled = !!r.globalLeveledUp || !!(r.levelUps && r.levelUps.length);
+    if (leveled) { playLevelUp(); setBurst(r.globalLeveledUp && r.globalLevel ? "NIVEAU " + r.globalLevel : "NIVEAU SUPÉRIEUR"); setTimeout(() => setBurst(null), 1400); }
+    else { playXp(); }
+    if (r.drop) playLoot(r.drop.rarity);
+    if (r.objective?.justCompleted) playObjective();
+  }
 
   async function complete(id: string) {
     const r = await fetch("/api/quests/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ questId: id }) }).then((res) => res.json());
     if (r.error) { flash(r.error, 3000); return; }
+    celebrate(r);
     let msg = "+" + r.gained + " XP";
     if (r.levelUps?.length) msg += " · " + r.levelUps.map((l: LevelUp) => l.name + " Niv." + l.level + " !").join(" · ");
     if (r.drop) msg += " · ✦ Butin : " + r.drop.name + " (" + (RARITY_LABEL[r.drop.rarity as Rarity] || r.drop.rarity) + ")";
@@ -49,6 +65,7 @@ export default function QuetesPage() {
     const r = await fetch("/api/weeklies/step", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ weeklyId, index }) }).then((res) => res.json());
     if (r.error) { flash(r.error, 3000); return; }
     if (r.rewarded) {
+      celebrate(r);
       let msg = "★ Mission hebdo accomplie ! +" + r.gained + " XP";
       if (r.levelUps?.length) msg += " · " + r.levelUps.map((l: LevelUp) => l.name + " Niv." + l.level).join(" · ");
       if (r.drop) msg += " · ✦ Butin : " + r.drop.name + " (" + (RARITY_LABEL[r.drop.rarity as Rarity] || r.drop.rarity) + ")";
@@ -77,7 +94,10 @@ export default function QuetesPage() {
   return (
     <div className="space-y-4">
       {toast && <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded border border-system-border bg-system-panel px-4 py-2 text-center text-sm text-system-accent shadow-system system-glow">[Système] {toast}</div>}
+      {floatXp && <div className="pointer-events-none fixed left-1/2 top-24 z-[60] anim-float text-2xl font-bold text-emerald-300 system-glow">{floatXp}</div>}
+      {burst && <div className="pointer-events-none fixed left-1/2 top-1/2 z-[60] anim-levelup text-3xl font-black uppercase tracking-[0.25em] text-system-accent system-glow">{burst}</div>}
       <h1 className="text-lg uppercase tracking-[0.2em] text-system-accent system-glow">Quêtes — {day}</h1>
+      {dayThemeCode && (() => { const a = ATTRIBUTES.find((x) => x.code === dayThemeCode); return a ? <p className="text-xs text-system-text/60">Thème du jour : <span style={{ color: a.color }}>{a.icon} {a.name}</span> — privilégie une quête {a.name} pour la quête obligatoire.</p> : null; })()}
 
       <SystemPanel title="[ Missions hebdomadaires ]">
         {weeklies.length === 0 && <p className="text-sm text-system-text/60">Aucune mission cette semaine.</p>}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import SystemPanel from "@/components/SystemPanel";
+import { playRankUp } from "@/lib/sfx";
 
 type Step = { label: string; done: boolean };
 type Dungeon = { id: string; title: string; description: string; rank: string; steps: Step[]; attributeCodes: string[]; rewardXp: number; status: string; isRankUp: boolean; targetRank: string | null };
@@ -44,7 +45,7 @@ export default function DonjonsPage() {
       body: JSON.stringify({ dungeonId: d.id, index }),
     }).then((res) => res.json());
     if (r.error) { flash(r.error); return; }
-    if (r.rankedUp) flash("⩘ RANG " + r.rankedUp.to + " ATTEINT ! Palier débloqué.");
+    if (r.rankedUp) { playRankUp(); flash("⩘ RANG " + r.rankedUp.to + " ATTEINT ! Palier débloqué."); }
     else if (r.cleared) {
       const lv = (r.levelUps as LevelUp[] | undefined)?.map((l) => l.name + " Niv." + l.level).join(" · ");
       flash("🏰 Donjon vaincu !" + (lv ? " " + lv : ""));

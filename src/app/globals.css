@@ -27,3 +27,25 @@ body {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .system-in { animation: systemIn 220ms ease-out both; }
+
+@keyframes levelUpBurst {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  20%  { opacity: 1; }
+  70%  { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.22); }
+}
+.anim-levelup { animation: levelUpBurst 1400ms ease-out both; }
+
+@keyframes floatUp {
+  0%   { opacity: 0; transform: translate(-50%, 0) scale(0.9); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -46px) scale(1.12); }
+}
+.anim-float { animation: floatUp 1100ms ease-out both; }
+
+@keyframes popIn {
+  0%   { transform: scale(0.85); }
+  55%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.anim-pop { animation: popIn 320ms ease-out both; }

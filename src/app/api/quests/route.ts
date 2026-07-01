@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gameDay } from "@/lib/date";
+import { themeForDay, DEFAULT_DAY_THEME } from "@/lib/progression";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,13 @@ export async function GET() {
   const quests = await prisma.quest.findMany({ where: { hunterId: hunter.id, active: true }, orderBy: { createdAt: "asc" } });
   const logs = await prisma.questLog.findMany({ where: { hunterId: hunter.id, date: day } });
   const doneIds = new Set(logs.map((l) => l.questId));
+  const weekday = new Date(day + "T12:00:00").getDay();
+  const themeMap = hunter.dayThemeJson ? JSON.parse(hunter.dayThemeJson) : DEFAULT_DAY_THEME;
+  const dayThemeCode = themeForDay(weekday, themeMap);
   return NextResponse.json({
     day,
+    dayThemeCode,
+    sfxEnabled: hunter.sfxEnabled,
     quests: quests.map((q) => ({ ...q, attributeCodes: JSON.parse(q.attributeCodes || "[]"), done: doneIds.has(q.id) })),
   });
 }
