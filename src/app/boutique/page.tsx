@@ -7,10 +7,13 @@ import { RARITY_COLORS, RARITY_LABEL, SLOT_LABEL, EQUIP_SLOTS, type Rarity, type
 import { SELL_VALUE } from "@/lib/loot";
 import { UPGRADE_MAX, upgradeCost } from "@/lib/effects";
 import { CONSUMABLES, BUFF_FIELD } from "@/lib/consumables";
+import { RUNE_LABEL, RUNE_ICON, EXO_MAX_PER_STAT, type RuneType } from "@/lib/forge";
 
 type Reward = { id: string; title: string; cost: number; icon?: string; redeemedAt: string | null };
-type Inv = { itemKey: string; qty: number; plus: number; name: string; slot: string; rarity: string };
+type Exo = { xpPct: number; goldPct: number; lootPct: number };
+type Inv = { itemKey: string; qty: number; plus: number; exo?: Exo; name: string; slot: string; rarity: string; setName?: string | null; setColor?: string | null };
 type Cosmetic = { key: string; name: string; slot: string; rarity: string; cost: number; owned: boolean };
+type TempleItem = { key: string; name: string; slot: string; rarity: string; cost: number; owned: boolean };
 
 export default function BoutiquePage() {
   const [gold, setGold] = useState(0);
@@ -23,13 +26,19 @@ export default function BoutiquePage() {
   const [atelierSlot, setAtelierSlot] = useState<Slot | "all">("all");
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mereons, setMereons] = useState(0);
+  const [temple, setTemple] = useState<TempleItem[]>([]);
+  const [runes, setRunes] = useState<Record<RuneType, number>>({ xp: 0, gold: 0, loot: 0 });
+  const [forgeOpen, setForgeOpen] = useState<string | null>(null);
 
   async function load() {
-    const [inv, rw, cs, cx] = await Promise.all([
+    const [inv, rw, cs, cx, al, fg] = await Promise.all([
       fetch("/api/inventory").then((r) => r.json()),
       fetch("/api/rewards").then((r) => r.json()),
       fetch("/api/consumables").then((r) => r.json()),
       fetch("/api/cosmetics").then((r) => r.json()),
+      fetch("/api/almanax").then((r) => r.json()).catch(() => null),
+      fetch("/api/forge").then((r) => r.json()).catch(() => null),
     ]);
     setGold(cs.gold ?? inv.gold ?? 0);
     setShards(cx.shards ?? inv.shards ?? 0);
@@ -38,6 +47,8 @@ export default function BoutiquePage() {
     setCons(cs.consumables ?? {});
     setBuffs(cs.buffs ?? {});
     setCosmetics(cx.catalog ?? []);
+    if (al && !al.error) { setMereons(al.mereons ?? 0); setTemple(al.temple ?? []); }
+    if (fg && !fg.error) setRunes(fg.runes ?? { xp: 0, gold: 0, loot: 0 });
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -67,6 +78,22 @@ export default function BoutiquePage() {
     const r = await fetch("/api/rewards/redeem", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }).then((res) => res.json());
     if (r.ok) { flash("Récompense débloquée 🎉"); load(); } else flash(r.error || "Erreur");
   }
+  async function buyTemple(key: string) {
+    const r = await fetch("/api/almanax", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "buy", key }) }).then((res) => res.json());
+    flash(r.ok ? "Relique du Temple débloquée ❖" : (r.error || "Erreur")); load();
+  }
+  async function forgeBreak(itemKey: string) {
+    const r = await fetch("/api/forge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "break", itemKey }) }).then((res) => res.json());
+    flash(r.ok ? "Brisé → +" + r.gained.count + " " + r.gained.label : (r.error || "Erreur")); load();
+  }
+  async function forgeApply(itemKey: string, rune: RuneType) {
+    const r = await fetch("/api/forge", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "apply", itemKey, rune }) }).then((res) => res.json());
+    if (!r.ok) { flash(r.error || "Erreur"); return; }
+    if (r.outcome === "success") flash("⚒️ SUCCÈS — +1% appliqué à l'objet !");
+    else if (r.outcome === "neutral") flash("… La rune n'a pas pris, mais elle est intacte.");
+    else flash("✕ Échec. La rune s'est brisée dans la Forge.");
+    load();
+  }
 
   if (loading) return <p className="animate-pulse text-system-accent">Chargement…</p>;
   const invAll = [...items].sort((a, b) => (b.qty - a.qty) || a.name.localeCompare(b.name));
@@ -84,7 +111,7 @@ export default function BoutiquePage() {
       {toast && <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded border border-system-border bg-system-panel px-4 py-2 text-sm text-system-accent shadow-system system-glow">[Système] {toast}</div>}
       <div className="flex items-baseline justify-between">
         <h1 className="text-lg uppercase tracking-[0.2em] text-system-accent system-glow">Boutique</h1>
-        <span className="text-sm">Or <span className="text-system-accent system-glow">{gold} 🪙</span> · Éclats <span className="system-glow" style={{ color: "#b06bff" }}>{shards} ✦</span></span>
+        <span className="text-sm">Or <span className="text-system-accent system-glow">{gold} 🪙</span> · Éclats <span className="system-glow" style={{ color: "#b06bff" }}>{shards} ✦</span> · Méréons <span className="system-glow" style={{ color: "#ffcf4d" }}>{mereons} ❖</span></span>
       </div>
 
       <div className="cards">
@@ -100,6 +127,32 @@ export default function BoutiquePage() {
               </div>
             ))}
           </div>
+        </SystemPanel>
+
+        {temple.length > 0 && (
+          <SystemPanel title="[ Temple de l'Almanax ❖ ]">
+            <p className="mb-3 text-xs text-system-text/40">Reliques exclusives payées en Méréons ❖ — gagnés uniquement via les offrandes quotidiennes de l&apos;Almanax. La constance a son propre trésor.</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {temple.map((c) => (
+                <div key={c.key} className="flex flex-col items-center rounded border bg-black/20 p-2 text-center" style={{ borderColor: c.owned ? "rgba(31,111,235,0.25)" : "#ffcf4d" }}>
+                  <div className="rounded bg-black/40"><LpcItemThumb itemKey={c.key} size={72} /></div>
+                  <p className="mt-1 text-xs" style={{ color: RARITY_COLORS[c.rarity as Rarity] }}>{c.name}{c.owned ? " ✓" : ""}</p>
+                  <p className="text-[11px] text-system-text/50">{SLOT_LABEL[c.slot as Slot] || c.slot}</p>
+                  <button onClick={() => buyTemple(c.key)} disabled={c.owned || mereons < c.cost} className="mt-2 w-full rounded border border-system-border px-2 py-1 text-xs uppercase tracking-widest hover:bg-system-accent/10 disabled:opacity-30" style={{ color: "#ffcf4d" }}>{c.owned ? "Possédé" : c.cost + " ❖"}</button>
+                </div>
+              ))}
+            </div>
+          </SystemPanel>
+        )}
+
+        <SystemPanel title="[ Forge des Ombres ⚒️ ]">
+          <p className="mb-2 text-xs text-system-text/40">Brise tes doublons pour extraire des Runes, puis tente de les appliquer sur une pièce équipable : 55% succès (+1%), 25% neutre, 20% la rune se brise. Max +{EXO_MAX_PER_STAT}% par stat et par objet.</p>
+          <div className="flex flex-wrap gap-3 text-sm">
+            {(Object.keys(RUNE_LABEL) as RuneType[]).map((t) => (
+              <span key={t} className="rounded border border-system-border/40 bg-black/30 px-3 py-1.5">{RUNE_ICON[t]} {RUNE_LABEL[t]} <span className="text-system-accent">×{runes[t] || 0}</span></span>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-system-text/50">Utilise les boutons « Briser » et « Forger » dans l&apos;Atelier ci-dessous.</p>
         </SystemPanel>
 
         <SystemPanel title="[ Consommables ]">
@@ -140,19 +193,36 @@ export default function BoutiquePage() {
               {invSorted.map((i) => {
                 const hasDupe = i.qty > 1;
                 const canUp = hasDupe && i.plus < UPGRADE_MAX;
+                const exo = i.exo || { xpPct: 0, goldPct: 0, lootPct: 0 };
+                const exoStr = [exo.xpPct ? "+" + exo.xpPct + "% XP" : "", exo.goldPct ? "+" + exo.goldPct + "% or" : "", exo.lootPct ? "+" + exo.lootPct + "% loot" : ""].filter(Boolean).join(" · ");
+                const open = forgeOpen === i.itemKey;
                 return (
-                  <li key={i.itemKey} className="flex items-center justify-between gap-2 border-b border-system-border/20 pb-2 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <div className="shrink-0 rounded bg-black/30" style={{ border: "1px solid " + RARITY_COLORS[i.rarity as Rarity] }}><LpcItemThumb itemKey={i.itemKey} size={48} /></div>
-                      <div>
-                        <p className="text-sm" style={{ color: RARITY_COLORS[i.rarity as Rarity] }}>{i.name}{i.plus > 0 ? " +" + i.plus : ""} <span className="text-xs text-system-text/50">×{i.qty}</span></p>
-                        <p className="text-xs text-system-text/50">{SLOT_LABEL[i.slot as Slot] || i.slot} · {RARITY_LABEL[i.rarity as Rarity] || i.rarity}</p>
+                  <li key={i.itemKey} className="border-b border-system-border/20 pb-2 last:border-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="shrink-0 rounded bg-black/30" style={{ border: "1px solid " + RARITY_COLORS[i.rarity as Rarity] }}><LpcItemThumb itemKey={i.itemKey} size={48} /></div>
+                        <div>
+                          <p className="text-sm" style={{ color: RARITY_COLORS[i.rarity as Rarity] }}>{i.name}{i.plus > 0 ? " +" + i.plus : ""} <span className="text-xs text-system-text/50">×{i.qty}</span></p>
+                          <p className="text-xs text-system-text/50">{SLOT_LABEL[i.slot as Slot] || i.slot} · {RARITY_LABEL[i.rarity as Rarity] || i.rarity}{i.setName ? <span style={{ color: i.setColor || undefined }}> · {i.setName}</span> : ""}</p>
+                          {exoStr && <p className="text-[11px]" style={{ color: "#ffcf4d" }}>⚒️ {exoStr}</p>}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col gap-1">
+                        <button onClick={() => upgrade(i.itemKey)} disabled={!canUp} className="rounded border border-system-border px-2 py-1 text-xs uppercase tracking-widest text-system-accent hover:bg-system-accent/10 disabled:opacity-30">{i.plus >= UPGRADE_MAX ? "Max" : "Améliorer " + upgradeCost(i.plus) + "🪙"}</button>
+                        <div className="flex gap-1">
+                          <button onClick={() => sell(i.itemKey)} disabled={!hasDupe} className="flex-1 rounded border border-system-border/50 px-2 py-1 text-xs uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">Vendre +{SELL_VALUE[i.rarity] ?? 0}🪙</button>
+                          <button onClick={() => forgeBreak(i.itemKey)} disabled={!hasDupe} className="flex-1 rounded border border-system-border/50 px-2 py-1 text-xs uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">Briser</button>
+                        </div>
+                        <button onClick={() => setForgeOpen(open ? null : i.itemKey)} className="rounded border border-amber-400/40 px-2 py-1 text-xs uppercase tracking-widest text-amber-300 hover:bg-amber-400/10">⚒️ Forger</button>
                       </div>
                     </div>
-                    <div className="flex shrink-0 flex-col gap-1">
-                      <button onClick={() => upgrade(i.itemKey)} disabled={!canUp} className="rounded border border-system-border px-2 py-1 text-xs uppercase tracking-widest text-system-accent hover:bg-system-accent/10 disabled:opacity-30">{i.plus >= UPGRADE_MAX ? "Max" : "Améliorer " + upgradeCost(i.plus) + "🪙"}</button>
-                      <button onClick={() => sell(i.itemKey)} disabled={!hasDupe} className="rounded border border-system-border/50 px-2 py-1 text-xs uppercase tracking-widest text-system-text/80 hover:bg-system-accent/10 disabled:opacity-30">Vendre +{SELL_VALUE[i.rarity] ?? 0}🪙</button>
-                    </div>
+                    {open && (
+                      <div className="mt-2 flex flex-wrap gap-1 rounded border border-amber-400/20 bg-black/30 p-2">
+                        {(Object.keys(RUNE_LABEL) as RuneType[]).map((t) => (
+                          <button key={t} onClick={() => forgeApply(i.itemKey, t)} disabled={(runes[t] || 0) < 1} className="rounded border border-system-border/40 px-2 py-1 text-xs text-system-text/80 hover:border-amber-400/60 disabled:opacity-30">{RUNE_ICON[t]} {RUNE_LABEL[t]} ×{runes[t] || 0}</button>
+                        ))}
+                      </div>
+                    )}
                   </li>
                 );
               })}

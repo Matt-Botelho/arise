@@ -211,6 +211,8 @@ et envoie un résumé push. `dayThemeJson` = attribut mis en avant par jour de s
 `dungeons` (+`/step`), `character` (+`/equip`, `/appearance`), `inventory` (+`/sell`, `/upgrade`),
 `cosmetics`, `consumables` (+`/use`), `rewards` (+`/redeem`), `achievements`, `settings`,
 `onboarding`, `history`, `push/*`, `system/tick`, `system/remind`.
+**V2 :** `integrations/health` (POST sécurisé + GET état), `almanax` (claim/buy),
+`oaths`, `gates`, `forge` (break/apply), `weekscore` — et `_lib/award.ts` (cœur partagé, pas une route).
 
 ### Libs (`src/lib/*`)
 `progression.ts` (rangs/XP/gate — source de vérité), `game.config.ts` (attributs, diff, pénalités ;
@@ -270,6 +272,77 @@ notifications push, pénalités réglables, **onglet Configuration** (coulisses)
 - Modèles d'aventure pré-remplis par domaine dans l'Assistant.
 - Pont Telegram (notifs + validation à distance).
 - Nettoyer les constantes de rang héritées dans `game.config.ts`.
+- Régénérer les assets LPC en spritesheets multi-frames (marche/idle) pour animer l'avatar.
+
+---
+
+## 11. V2 — « Le Système s'éveille » (voir PLAN_V2.md pour le game design complet)
+
+Grosse évolution livrée en une passe : pont Apple Santé, panoplies, Almanax, Serments,
+Portes, Ombre-compagnon, Forge des Ombres, notes de semaine, Failles mensuelles, pity timer,
+cérémonie de loot, PWA iOS. **Le cœur de récompense est centralisé** dans
+`src/app/api/_lib/award.ts` (dossier `_lib` = pas une route ; il vit sous `api/` exprès,
+pour que les faux positifs Prisma locaux restent couverts par la règle de validation §8.4).
+
+### Nouveaux modèles Prisma (tous additifs, `db push` sans risque)
+- **HealthSample** — `date`, `metric` (clé canonique), `value`, `unit`. `@@unique([hunterId, date, metric])`.
+- **Gate** — Porte du jour : `date`, `rank`, `title`, `gold`, `xp`, `status` (`open/cleared/expired`). `@@unique([hunterId, date])`.
+- **WeekScore** — `weekKey`, `score`, `grade` (S/A/B/C). `@@unique([hunterId, weekKey])`.
+- **Hunter** += `pityCounter`, `mereons` (❖), `almanaxJson`, `oathsJson`, `shadowJson`, `gatePoolJson`, `runesJson`, `bestWeekScore`.
+- **Quest** += `metricKey`, `threshold` (type `auto` = validée par Apple Santé).
+- **Objective** += `metricKey` (métrique auto-alimentée). **InventoryItem** += `exoJson` (forge).
+- **Dungeon** += `isRift`, `monthKey` (Failles mensuelles).
+
+### Nouveaux systèmes (libs pures + tests `test/p5.test.ts`, 46 assertions)
+- **Pont Apple Santé** (`lib/health.ts`, `POST /api/integrations/health`) : l'app iOS
+  *Health Auto Export* (Automations → REST API) POSTe son JSON avec le header
+  `x-system-secret` (même secret que le cron). 15 métriques canoniques (pas, kcal actives/
+  ingérées, poids, sommeil, distance…), agrégation `sum/last` par jour. Effets : quêtes
+  `auto` validées au seuil (+ push « Le Système a détecté… »), objectifs `metric` liés
+  mis à jour tout seuls (balance → poids). Config : onglet **📡 Intégrations**.
+- **Panoplies** (`lib/sets.ts`) : 6 sets nommés (Vagabond, Chevalier, Faucheur, Légionnaire,
+  Berserker, Monarque), pièces multi-slots, bonus par paliers (2/3/4 pièces équipées),
+  aura sur l'avatar quand complète, lore par item (`loreFor`). `validateSets()` en test.
+- **Pity timer** (`lib/loot.ts` : `rollLootWithPity`) : au 10ᵉ échec consécutif, drop épique+
+  garanti. Compteur `Hunter.pityCounter`.
+- **Almanax** (`lib/almanax.ts`, `/api/almanax`) : offrande quotidienne déterministe
+  (hash du jour), vérifiée CÔTÉ SERVEUR (`offeringSatisfied` + `checkAlmanax` dans award.ts,
+  branchée sur quêtes/hebdos/objectifs). Récompense : **Méréons ❖** + or. **Temple** :
+  3 reliques exclusives en ❖ (exclues du loot via `TEMPLE_SET`).
+- **Serments** (`lib/oaths.ts`, `/api/oaths`) : façon idoles Dofus. 3 serments, max 2/jour,
+  scellés le matin, multiplicateurs immédiats (XP/or), évalués au tick — échec = malus PV/or.
+- **Ombre-compagnon** (`lib/shadow.ts`, composant `ShadowCompanion` SVG) : +1 Essence par
+  journée parfaite (tick), 4 stades (0/7/30/90), bonus XP passif si « nourrie » (journée
+  parfaite hier/aujourd'hui), s'assombrit sinon — ne meurt jamais. Affichée sur le Statut.
+- **Portes** (`lib/gates.ts`, `/api/gates`) : au tick, 1 chance sur 3 qu'une Porte s'ouvre
+  (rang pondéré D→S, récompenses croissantes), épreuve tirée du pool configurable
+  (Réglages), expire en fin de jour de jeu. Push à l'ouverture.
+- **Forge des Ombres** (`lib/forge.ts`, `/api/forge`) : briser un doublon → Runes (type selon
+  slot, quantité selon rareté) ; appliquer une rune : 55% succès (+1% exo), 25% neutre
+  (rune gardée), 20% brisée. Borne dure +5%/stat/objet. UI dans Boutique→Atelier.
+- **Note de semaine** (`lib/weekscore.ts`, `/api/weekscore`) : calculée au premier tick de
+  la semaine (done×10 + jours parfaits×25 − échecs×15 → S/A/B/C), record = +150 or +3 ✦.
+  Affichée dans Stats.
+- **Failles mensuelles** : au tick, un donjon `isRift` par mois (5 gabarits déterministes
+  dans `gates.ts`), clear = or + 5 ✦ + 15 ❖.
+- **Cérémonie de loot** (`components/LootCard.tsx`) : carte qui se retourne, cadre par
+  rareté, lore machine à écrire (`Typewriter.tsx`), progression de panoplie, pluie de
+  particules pour légendaire+.
+- **PWA iOS** : `apple-touch-icon.png` + `icon-192/512.png` (générés), manifest enrichi,
+  `appleWebApp` dans layout. Poussière d'ambiance en fond (CSS pur).
+
+### Économie V2 (3 monnaies)
+`or` (quêtes) → plaisir réel & consommables · `Éclats ✦` (donjons/rangs/records) → skins
+prestige · `Méréons ❖` (offrandes Almanax/Failles) → reliques du Temple. Chaque monnaie a
+sa boucle et son rythme.
+
+### ⚠ Pièges V2
+- `award.ts` importe la moitié des libs : tout nouveau bonus doit passer PAR LUI (ne pas
+  recalculer l'XP dans une route).
+- L'ordre des multiplicateurs : `baseXp × diff × épuisé × (1+bonus%/100) × potion × serments`.
+- `weeklies/step` garde son propre award (loot garanti « S ») mais appelle `checkAlmanax`.
+- Le client Prisma LOCAL ne connaît pas les nouveaux champs tant que `prisma generate`
+  n'a pas tourné (Docker) → faux positifs tsc dans `src/app/api/**` uniquement (règle §8.4).
 
 ---
 

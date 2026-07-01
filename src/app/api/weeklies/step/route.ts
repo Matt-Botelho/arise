@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { applyGlobalXp, applyAttrXp, rankCeiling } from "@/lib/progression";
 import { rollLoot } from "@/lib/loot";
 import { dungeonProgress, type DungeonStep } from "@/lib/achievements";
+import { checkAlmanax } from "@/app/api/_lib/award";
 
 export const dynamic = "force-dynamic";
 
@@ -43,5 +44,6 @@ export async function POST(req: Request) {
     if (it) { await prisma.inventoryItem.upsert({ where: { hunterId_itemKey: { hunterId: hunter.id, itemKey: it.key } }, update: { qty: { increment: 1 } }, create: { hunterId: hunter.id, itemKey: it.key } }); drop = { key: it.key, name: it.name, rarity: it.rarity }; }
   }
   await prisma.weekly.update({ where: { id: weekly.id }, data: { stepsJson: JSON.stringify(steps), status: newStatus } });
-  return NextResponse.json({ ok: true, rewarded, gained, levelUps, drop });
+  const almanax = steps[b.index].done ? await checkAlmanax(hunter.id, { weeklyStep: true }) : null;
+  return NextResponse.json({ ok: true, rewarded, gained, levelUps, drop, almanax });
 }

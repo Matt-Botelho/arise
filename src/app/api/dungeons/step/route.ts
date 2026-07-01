@@ -64,6 +64,9 @@ export async function POST(req: Request) {
       let loot: { name: string; rarity: string } | null = null;
       if (it) { await prisma.inventoryItem.upsert({ where: { hunterId_itemKey: { hunterId: hunter.id, itemKey: it.key } }, update: { qty: { increment: 1 } }, create: { hunterId: hunter.id, itemKey: it.key } }); loot = { name: it.name, rarity: it.rarity }; }
       rankedUp = { from: hunter.rank, to, title, intro: RANK_INTRO[to] || "", gold: goldBonus, loot };
+    } else if (dungeon.isRift) {
+      // Faille mensuelle : récompense premium (or + Éclats + Méréons).
+      await prisma.hunter.update({ where: { id: hunter.id }, data: { gold: hunter.gold + Math.round(dungeon.rewardXp / 3), shards: hunter.shards + 5, mereons: hunter.mereons + 15 } });
     } else {
       await prisma.hunter.update({ where: { id: hunter.id }, data: { gold: hunter.gold + Math.round(dungeon.rewardXp / 5) } });
     }

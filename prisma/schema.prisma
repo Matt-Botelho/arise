@@ -31,6 +31,14 @@ model Hunter {
   lastRollover     String?
   appearanceJson   String?
   equippedJson     String?
+  pityCounter      Int      @default(0)
+  mereons          Int      @default(0)
+  almanaxJson      String?
+  oathsJson        String?
+  shadowJson       String?
+  gatePoolJson     String?
+  runesJson        String?
+  bestWeekScore    Int      @default(0)
   createdAt        DateTime @default(now())
 
   attributes Attribute[]
@@ -44,6 +52,9 @@ model Hunter {
   inventory  InventoryItem[]
   weeklies   Weekly[]
   objectives Objective[]
+  healthSamples HealthSample[]
+  gates      Gate[]
+  weekScores WeekScore[]
   onboarded  Boolean  @default(false)
 }
 
@@ -77,6 +88,8 @@ model Quest {
   targetRank     String?
   objectiveId    String?
   themedDay      String?
+  metricKey      String?
+  threshold      Float?
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
 
@@ -139,6 +152,8 @@ model Dungeon {
   rewardXp       Int      @default(300)
   status         String   @default("active")
   isRankUp       Boolean  @default(false)
+  isRift         Boolean  @default(false)
+  monthKey       String?
   targetRank     String?
   createdAt      DateTime @default(now())
 }
@@ -163,6 +178,7 @@ model InventoryItem {
   itemKey    String
   qty        Int      @default(1)
   plus       Int      @default(0)
+  exoJson    String?
   acquiredAt DateTime @default(now())
 
   @@unique([hunterId, itemKey])
@@ -205,5 +221,46 @@ model Objective {
   startValue    Float?
   targetValue   Float?
   currentValue  Float?
+  metricKey     String?
   createdAt     DateTime @default(now())
+}
+
+model HealthSample {
+  id        String   @id @default(cuid())
+  hunterId  String
+  hunter    Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  date      String
+  metric    String
+  value     Float
+  unit      String   @default("")
+  updatedAt DateTime @updatedAt
+
+  @@unique([hunterId, date, metric])
+}
+
+model Gate {
+  id        String   @id @default(cuid())
+  hunterId  String
+  hunter    Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  date      String
+  rank      String   @default("D")
+  title     String
+  gold      Int      @default(100)
+  xp        Int      @default(100)
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+
+  @@unique([hunterId, date])
+}
+
+model WeekScore {
+  id        String   @id @default(cuid())
+  hunterId  String
+  hunter    Hunter   @relation(fields: [hunterId], references: [id], onDelete: Cascade)
+  weekKey   String
+  score     Int      @default(0)
+  grade     String   @default("C")
+  createdAt DateTime @default(now())
+
+  @@unique([hunterId, weekKey])
 }

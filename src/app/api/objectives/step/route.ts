@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { gameDay, periodKeyFor } from "@/lib/date";
 import { applyGlobalXp, applyAttrXp, rankCeiling } from "@/lib/progression";
+import { checkAlmanax } from "@/app/api/_lib/award";
 
 export const dynamic = "force-dynamic";
 type St = { label: string; done: boolean };
@@ -44,5 +45,6 @@ export async function POST(req: Request) {
   }
 
   await prisma.objective.update({ where: { id: obj.id }, data: { stepsJson: JSON.stringify(steps), periodKey: pkey, lastRewardKey, status } });
-  return NextResponse.json({ ok: true, gained, allDone, leveledUp, levelUps, status });
+  const almanax = steps[b.index].done ? await checkAlmanax(hunter.id, { objectiveStep: true }) : null;
+  return NextResponse.json({ ok: true, gained, allDone, leveledUp, levelUps, status, almanax });
 }

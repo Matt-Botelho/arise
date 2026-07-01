@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { totalPower, isExhausted, xpForLevel } from "@/lib/game";
+import { totalPower, isExhausted, xpForLevel, previousDay } from "@/lib/game";
 import { rankCeiling, nextRank, rankUpGate, globalXpForLevel } from "@/lib/progression";
+import { gameDay } from "@/lib/date";
+import { computeSetBonuses } from "@/lib/sets";
+import { stageFor, nextStage, isFed, DEFAULT_SHADOW, type ShadowState } from "@/lib/shadow";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +32,26 @@ export async function GET() {
 
   const penalties = await prisma.penalty.findMany({ where: { hunterId: hunter.id }, orderBy: { createdAt: "desc" }, take: 5 });
 
+  // Ombre-compagnon + panoplies équipées (auras).
+  const today = gameDay(new Date(), hunter.timezone, hunter.dayRolloverHour);
+  let shadowState: ShadowState = DEFAULT_SHADOW;
+  try { if (hunter.shadowJson) shadowState = JSON.parse(hunter.shadowJson); } catch {}
+  const sStage = stageFor(shadowState.essence);
+  const sNext = nextStage(shadowState.essence);
+  const fed = isFed(shadowState, today, previousDay(today));
+  let equipped: Record<string, { key: string } | null> = {};
+  try { if (hunter.equippedJson) equipped = JSON.parse(hunter.equippedJson); } catch {}
+  const sets = computeSetBonuses(equipped);
+
   return NextResponse.json({
+    shadow: {
+      essence: shadowState.essence, fed,
+      stage: { key: sStage.key, name: sStage.name, xpPct: sStage.xpPct, desc: sStage.desc },
+      next: sNext ? { name: sNext.name, at: sNext.at } : null,
+    },
+    sets: { active: sets.active, completed: sets.completed, xpPct: sets.xpPct, goldPct: sets.goldPct, lootPct: sets.lootPct },
+    mereons: hunter.mereons,
+    bestWeekScore: hunter.bestWeekScore,
     hunter: {
       name: hunter.name, rank: hunter.rank,
       globalLevel: hunter.globalLevel, globalXp: hunter.globalXp, globalXpNext: globalXpForLevel(hunter.globalLevel),

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import SystemPanel from "@/components/SystemPanel";
 import LpcAvatar from "@/components/LpcAvatar";
+import ShadowCompanion from "@/components/ShadowCompanion";
 import { DEFAULT_EQUIPPED, type Equipped } from "@/lib/lpc-items";
 
 type Attr = { id: string; code: string; name: string; icon: string; color: string; level: number; xp: number; xpNext: number; capped: boolean };
@@ -14,6 +15,9 @@ type Status = {
     hp: number; maxHp: number; mp: number; maxMp: number; gold: number; title: string; streak: number; exhausted: boolean; onboarded: boolean;
   };
   attributes: Attr[]; power: number; penalties: Penalty[];
+  shadow?: { essence: number; fed: boolean; stage: { key: string; name: string; xpPct: number; desc: string }; next: { name: string; at: number } | null };
+  sets?: { active: { key: string; name: string; color: string; pieces: number; total: number }[]; completed: string[]; xpPct: number; goldPct: number; lootPct: number };
+  mereons?: number;
 };
 
 const RANKS = ["F", "E", "D", "C", "B", "A", "S", "S+", "SS", "SS Elite"];
@@ -35,6 +39,7 @@ export default function StatutPage() {
   const rankPct = Math.max(0, Math.min(100, Math.round(((h.globalLevel - floor) / 10) * 100)));
   const rankIdx = RANKS.indexOf(h.rank);
   const attrsOkCount = data.attributes.filter((a) => a.level >= h.attrThreshold).length;
+  const completedSet = data.sets && data.sets.completed.length ? data.sets.active.find((s) => data.sets && data.sets.completed.includes(s.key)) : null;
 
   return (
     <div>
@@ -47,7 +52,13 @@ export default function StatutPage() {
       <div className="mb-4 md:mb-0 md:sticky md:top-4">
         <SystemPanel title="[ Chasseur ]">
           <div className="flex flex-col items-center">
-            {equipped ? <LpcAvatar equipped={equipped} size={320} /> : <div className="h-[320px] w-full animate-pulse text-center text-system-accent">…</div>}
+            {equipped ? (
+              <div className="relative">
+                {completedSet && <div className="avatar-aura" style={{ "--aura": completedSet.color + "59" } as React.CSSProperties} />}
+                <div className="avatar-breathe relative"><LpcAvatar equipped={equipped} size={320} /></div>
+              </div>
+            ) : <div className="h-[320px] w-full animate-pulse text-center text-system-accent">…</div>}
+            {completedSet && <p className="mt-1 text-xs" style={{ color: completedSet.color }}>✦ {completedSet.name} — complète</p>}
             <h1 className="mt-3 text-2xl font-bold system-glow">{h.name}</h1>
             <p className="text-xs text-system-text/70">« {h.title} »</p>
             <div className="mt-1 flex items-end gap-2">
@@ -75,13 +86,47 @@ export default function StatutPage() {
             <div className="flex justify-between text-[11px] uppercase tracking-widest text-system-text/50"><span>PV</span><span>{h.hp}/{h.maxHp}</span></div>
             <div className="mt-1 h-2 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: hpPct + "%", backgroundColor: hpPct < 30 ? "#ff4d4d" : "#ff7a45" }} /></div>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-3 text-center text-sm">
+          <div className="mt-4 grid grid-cols-4 gap-2 text-center text-sm">
             <Stat label="Série" value={"🔥 " + h.streak} />
             <Stat label="Énergie" value={h.mp + "/" + h.maxMp} />
             <Stat label="Or" value={String(h.gold)} />
+            <Stat label="Méréons" value={"❖ " + (data.mereons ?? 0)} />
           </div>
-          <p className="mt-3 text-center text-xs text-system-text/60">Puissance totale : <span className="text-system-accent">{data.power}</span></p>
+          <p className="mt-3 text-center text-xs text-system-text/60">Puissance totale : <span className="text-system-accent">{data.power}</span>
+            {data.sets && (data.sets.xpPct > 0 || data.sets.goldPct > 0 || data.sets.lootPct > 0) && <span className="ml-2 text-system-text/50">· Panoplies : +{data.sets.xpPct}% XP, +{data.sets.goldPct}% or, +{data.sets.lootPct}% loot</span>}
+          </p>
         </SystemPanel>
+
+        {data.shadow && (
+          <SystemPanel title="[ Ton Ombre ]">
+            <div className="flex items-center gap-4">
+              <ShadowCompanion stageKey={data.shadow.stage.key} fed={data.shadow.fed} size={110} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold" style={{ color: data.shadow.fed ? "#b06bff" : "#5f7285" }}>{data.shadow.stage.name}</p>
+                <p className="text-xs italic text-system-text/60">{data.shadow.stage.desc}</p>
+                <p className="mt-1 text-xs">
+                  {data.shadow.fed
+                    ? <span className="text-emerald-400">Nourrie — elle t&apos;accorde +{data.shadow.stage.xpPct}% XP.</span>
+                    : <span className="text-system-text/50">Assombrie… valide toutes tes quêtes obligatoires pour la nourrir.</span>}
+                </p>
+                {data.shadow.next && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-[11px] text-system-text/50"><span>Essence : {data.shadow.essence}</span><span>{data.shadow.next.name} à {data.shadow.next.at}</span></div>
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-black/40"><div className="h-full" style={{ width: Math.min(100, Math.round((data.shadow.essence / data.shadow.next.at) * 100)) + "%", backgroundColor: "#b06bff" }} /></div>
+                  </div>
+                )}
+              </div>
+            </div>
+            {data.sets && data.sets.active.length > 0 && (
+              <div className="mt-3 border-t border-system-border/20 pt-2">
+                <p className="mb-1 text-[11px] uppercase tracking-widest text-system-text/50">Panoplies portées</p>
+                {data.sets.active.map((s) => (
+                  <p key={s.key} className="text-xs" style={{ color: s.color }}>{s.pieces >= s.total ? "✦ " : "· "}{s.name} <span className="text-system-text/50">{s.pieces}/{s.total}</span></p>
+                ))}
+              </div>
+            )}
+          </SystemPanel>
+        )}
 
         <SystemPanel title="[ Histoire Principale ]">
           <div className="flex flex-wrap items-center gap-1.5">

@@ -5,13 +5,15 @@ import ObjectiveWizard from "@/components/ObjectiveWizard";
 import { ATTRIBUTES } from "@/lib/game.config";
 import { SUGGESTIONS } from "@/lib/suggestions";
 import { setSfxEnabled, playLevelUp } from "@/lib/sfx";
+import { HEALTH_METRICS, METRIC_BY_KEY } from "@/lib/health";
 
-type Settings = { name: string; penaltyIntensity: string; dayRolloverHour: number; timezone: string; dayTheme: Record<string, string>; sfxEnabled: boolean };
+type Settings = { name: string; penaltyIntensity: string; dayRolloverHour: number; timezone: string; dayTheme: Record<string, string>; sfxEnabled: boolean; gatePool?: string[] };
+type HealthLatest = Record<string, { value: number; date: string; unit: string }>;
 type Quest = { id: string; title: string; attributeCodes: string[]; baseXp: number; difficulty: string; isMandatory: boolean; type?: string };
 type Step = { label: string; done: boolean };
 type Weekly = { id: string; title: string; steps: Step[]; attributeCodes: string[]; baseXp: number; status: string };
 type OQ = { id: string; title: string; baseXp: number; difficulty: string };
-type Obj = { id: string; parentId: string | null; attributeCode: string; horizon: string; title: string; status: string; progress: number; targetCount: number; kind: string; recurrence: string; steps: { label: string; done: boolean }[] | null; metricUnit: string | null; startValue: number | null; targetValue: number | null; currentValue: number | null; quests: OQ[] };
+type Obj = { id: string; parentId: string | null; attributeCode: string; horizon: string; title: string; status: string; progress: number; targetCount: number; kind: string; recurrence: string; steps: { label: string; done: boolean }[] | null; metricUnit: string | null; startValue: number | null; targetValue: number | null; currentValue: number | null; metricKey?: string | null; quests: OQ[] };
 type Dungeon = { id: string; title: string; rank: string; steps: Step[]; isRankUp: boolean; targetRank: string | null };
 type Reward = { id: string; title: string; cost: number; icon?: string };
 type HInfo = { rank: string; nextRank: string | null };
@@ -46,7 +48,7 @@ const btnCls = "rounded border border-system-border px-3 py-2 text-xs uppercase 
 const chip = (on: boolean) => "rounded border px-2 py-1 text-xs " + (on ? "border-system-accent text-system-accent" : "border-system-border/40 text-system-text/60");
 
 export default function ConfigurationPage() {
-  const [tab, setTab] = useState<"assistant" | "quetes" | "objectifs" | "donjons" | "recompenses" | "reglages">("assistant");
+  const [tab, setTab] = useState<"assistant" | "quetes" | "objectifs" | "donjons" | "recompenses" | "integrations" | "reglages">("assistant");
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,9 +69,12 @@ export default function ConfigurationPage() {
   const [openAdd, setOpenAdd] = useState<string | null>(null); const [customQ, setCustomQ] = useState("");
   const [dTitle, setDTitle] = useState(""); const [dRankUp, setDRankUp] = useState(true); const [dRank, setDRank] = useState("D"); const [dSteps, setDSteps] = useState(""); const [dCodes, setDCodes] = useState<string[]>([]); const [dReward, setDReward] = useState(400);
   const [rTitle, setRTitle] = useState(""); const [rCost, setRCost] = useState(100); const [rIcon, setRIcon] = useState("🎁");
+  const [health, setHealth] = useState<HealthLatest>({}); const [healthCount, setHealthCount] = useState(0);
+  const [aTitle, setATitle] = useState(""); const [aMetric, setAMetric] = useState("steps"); const [aThreshold, setAThreshold] = useState(8000); const [aCodes, setACodes] = useState<string[]>([]); const [aXp, setAXp] = useState(50); const [aMand, setAMand] = useState(false);
+  const [gatePoolText, setGatePoolText] = useState("");
 
   async function load() {
-    const [q, w, o, d, rw, st, stt] = await Promise.all([
+    const [q, w, o, d, rw, st, stt, he] = await Promise.all([
       fetch("/api/quests").then((r) => r.json()),
       fetch("/api/weeklies").then((r) => r.json()),
       fetch("/api/objectives").then((r) => r.json()),
@@ -77,13 +82,15 @@ export default function ConfigurationPage() {
       fetch("/api/rewards").then((r) => r.json()),
       fetch("/api/settings").then((r) => r.json()),
       fetch("/api/status").then((r) => r.json()),
+      fetch("/api/integrations/health").then((r) => r.json()).catch(() => null),
     ]);
     setQuests((q.quests || []).filter((x: Quest) => x.type !== "rankup"));
     setWeeklies(w.weeklies || []);
     setObjs(o.objectives || []);
     setDungeons(d.dungeons || []);
     setRewards(rw.rewards || []);
-    if (!st.error) { setS(st); setSfxEnabled(st.sfxEnabled !== false); }
+    if (he && !he.error) { setHealth(he.latest || {}); setHealthCount(he.count || 0); }
+    if (!st.error) { setS(st); setSfxEnabled(st.sfxEnabled !== false); setGatePoolText((st.gatePool || []).join("\n")); }
     if (!stt.error) setHinfo({ rank: stt.hunter.rank, nextRank: stt.hunter.nextRank });
     if (typeof window !== "undefined" && "Notification" in window) setNotif(Notification.permission);
     setLoading(false);
@@ -142,8 +149,18 @@ export default function ConfigurationPage() {
 
   async function saveSettings() {
     if (!s) return;
-    const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(s) }).then((x) => x.json());
+    const gatePool = gatePoolText.split("\n").map((x) => x.trim()).filter(Boolean);
+    const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...s, gatePool }) }).then((x) => x.json());
     flash(r.ok ? "Réglages enregistrés ✓" : (r.error || "Erreur"));
+  }
+  async function createAutoQuest() {
+    if (!aTitle.trim()) return;
+    const r = await fetch("/api/quests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: aTitle, attributeCodes: aCodes, baseXp: aXp, isMandatory: aMand, metricKey: aMetric, threshold: aThreshold }) }).then((x) => x.json());
+    if (r.ok) { setATitle(""); setACodes([]); setAXp(50); setAMand(false); flash("Quête auto créée ✓ — le Système la validera tout seul"); load(); } else flash(r.error || "Erreur");
+  }
+  async function linkObjMetric(id: string, metricKey: string) {
+    await fetch("/api/objectives", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, metricKey: metricKey || null }) });
+    flash(metricKey ? "Objectif lié à Apple Santé ✓" : "Lien retiré"); load();
   }
   async function enableNotifs() {
     try {
@@ -161,7 +178,7 @@ export default function ConfigurationPage() {
   async function testNotif() { const r = await fetch("/api/push/test", { method: "POST" }).then((x) => x.json()); flash(r.error ? r.error : "Envoyé à " + (r.sent ?? 0) + " appareil(s)"); }
 
   if (loading) return <p className="animate-pulse text-system-accent">Chargement…</p>;
-  const TABS: [typeof tab, string][] = [["assistant", "✨ Assistant"], ["quetes", "Quêtes & Hebdo"], ["objectifs", "Objectifs"], ["donjons", "Donjons"], ["recompenses", "Récompenses"], ["reglages", "Réglages"]];
+  const TABS: [typeof tab, string][] = [["assistant", "✨ Assistant"], ["quetes", "Quêtes & Hebdo"], ["objectifs", "Objectifs"], ["donjons", "Donjons"], ["recompenses", "Récompenses"], ["integrations", "📡 Intégrations"], ["reglages", "Réglages"]];
   const questGroups = groupByAttr(quests, (q) => q.attributeCodes[0] || "");
   const weeklyGroups = groupByAttr(weeklies, (w) => w.attributeCodes[0] || "");
 
@@ -206,7 +223,7 @@ export default function ConfigurationPage() {
                 <ul className="space-y-1">
                   {list.map((q) => (
                     <li key={q.id} className="flex items-center justify-between gap-2 border-b border-system-border/15 pb-1 last:border-0">
-                      <span className="text-sm">{q.isMandatory ? "★ " : ""}{q.title} <span className="text-xs text-system-text/40">{q.difficulty} · {q.baseXp}XP</span></span>
+                      <span className="text-sm">{q.isMandatory ? "★ " : ""}{q.title} <span className="text-xs text-system-text/40">{q.difficulty} · {q.baseXp}XP{q.type === "auto" ? " · AUTO" : ""}</span></span>
                       <button onClick={() => delQuest(q.id)} className="shrink-0 text-xs text-red-400/70 hover:text-red-400">✕</button>
                     </li>
                   ))}
@@ -375,6 +392,77 @@ export default function ConfigurationPage() {
         </div>
       )}
 
+      {tab === "integrations" && (
+        <div className="cards">
+          <SystemPanel title="[ 📡 Apple Santé — le pont ]">
+            <p className="text-xs text-system-text/60">Apple Santé est ton hub : ta balance, ton app calories et ton iPhone y écrivent tout. Installe l&apos;app <span className="text-system-accent">Health Auto Export</span> (iOS), crée une automation <span className="text-system-accent">REST API</span> avec :</p>
+            <ul className="mt-2 space-y-1 text-xs text-system-text/70">
+              <li>• URL : <code className="rounded bg-black/40 px-1 py-0.5 text-system-accent">https://TON-DOMAINE/api/integrations/health</code></li>
+              <li>• Header : <code className="rounded bg-black/40 px-1 py-0.5 text-system-accent">x-system-secret: TON_SECRET</code> (le même que le cron)</li>
+              <li>• Format : JSON · métriques : pas, calories, poids, sommeil… (toutes reconnues sont stockées)</li>
+              <li>• Fréquence : toutes les heures (l&apos;export ne tourne que téléphone déverrouillé — normal, limite iOS)</li>
+            </ul>
+            <div className="mt-3 border-t border-system-border/20 pt-2">
+              <p className="mb-1 text-xs uppercase tracking-widest text-system-text/50">Dernières données reçues {healthCount > 0 ? "(" + healthCount + " échantillons)" : ""}</p>
+              {Object.keys(health).length === 0 ? (
+                <p className="text-sm text-system-text/60">Rien reçu pour l&apos;instant. Le Système attend ton premier battement.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  {Object.entries(health).map(([k, v]) => {
+                    const def = METRIC_BY_KEY[k];
+                    return (
+                      <div key={k} className="rounded border border-system-border/30 bg-black/20 p-2 text-center">
+                        <p className="text-sm text-system-accent">{def?.icon} {Math.round(v.value * 10) / 10} <span className="text-xs text-system-text/50">{def?.unit || v.unit}</span></p>
+                        <p className="text-[10px] text-system-text/50">{def?.label || k} · {v.date}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </SystemPanel>
+
+          <SystemPanel title="[ Nouvelle quête AUTO ]">
+            <p className="mb-2 text-xs text-system-text/40">Validée automatiquement quand la métrique atteint le seuil. Push : « Le Système a détecté… ». Zéro friction.</p>
+            <input className={inputCls} placeholder="Ex. Marcher 8 000 pas" value={aTitle} onChange={(e) => setATitle(e.target.value)} />
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <select className="rounded border border-system-border/40 bg-black/40 px-2 py-2 text-sm outline-none" value={aMetric} onChange={(e) => setAMetric(e.target.value)}>
+                {HEALTH_METRICS.map((m) => <option key={m.key} value={m.key}>{m.icon} {m.label} ({m.unit})</option>)}
+              </select>
+              <span className="text-xs text-system-text/60">Seuil ≥</span>
+              <input type="number" min={1} className="w-24 rounded border border-system-border/40 bg-black/40 px-2 py-1 text-sm outline-none" value={aThreshold} onChange={(e) => setAThreshold(parseFloat(e.target.value || "1"))} />
+            </div>
+            <p className="mt-2 text-xs uppercase tracking-widest text-system-text/60">Attributs</p>
+            <div className="mt-1 flex flex-wrap gap-1">{CODES.map((c) => <button key={c} onClick={() => toggle(aCodes, setACodes, c)} className={chip(aCodes.includes(c))}>{c}</button>)}</div>
+            <div className="mt-2 flex items-center gap-3 text-sm">
+              <span className="text-xs text-system-text/60">XP</span>
+              <input type="number" min={1} className="w-20 rounded border border-system-border/40 bg-black/40 px-2 py-1 text-sm outline-none" value={aXp} onChange={(e) => setAXp(parseInt(e.target.value || "1", 10))} />
+              <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={aMand} onChange={(e) => setAMand(e.target.checked)} /> Obligatoire</label>
+            </div>
+            <button onClick={createAutoQuest} className={"mt-3 w-full " + btnCls}>Créer la quête auto</button>
+          </SystemPanel>
+
+          <SystemPanel title="[ Objectifs métriques liés ]">
+            <p className="mb-2 text-xs text-system-text/40">Lie un objectif métrique (poids, etc.) à Apple Santé : sa valeur courante se met à jour toute seule à chaque pesée / synchro.</p>
+            {objs.filter((o) => o.kind === "metric" && o.status === "active").length === 0 ? (
+              <p className="text-sm text-system-text/60">Aucun objectif métrique actif. Crée-en un dans l&apos;onglet Objectifs.</p>
+            ) : (
+              <ul className="space-y-2">
+                {objs.filter((o) => o.kind === "metric" && o.status === "active").map((o) => (
+                  <li key={o.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span>{o.title} <span className="text-xs text-system-text/50">{(o.currentValue ?? o.startValue ?? 0)} → {o.targetValue} {o.metricUnit}</span></span>
+                    <select className="rounded border border-system-border/40 bg-black/40 px-2 py-1 text-sm outline-none" value={o.metricKey || ""} onChange={(e) => linkObjMetric(o.id, e.target.value)}>
+                      <option value="">— manuel —</option>
+                      {HEALTH_METRICS.map((m) => <option key={m.key} value={m.key}>{m.icon} {m.label}</option>)}
+                    </select>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SystemPanel>
+        </div>
+      )}
+
       {tab === "reglages" && s && (
         <div className="cards">
           <SystemPanel title="[ Notifications ]">
@@ -412,6 +500,11 @@ export default function ConfigurationPage() {
                 </label>
               ))}
             </div>
+          </SystemPanel>
+
+          <SystemPanel title="[ ⛩ Pool des Portes ]">
+            <p className="mb-2 text-xs text-system-text/40">Micro-épreuves surprises : chaque matin, 1 chance sur 3 qu&apos;une Porte s&apos;ouvre avec l&apos;une d&apos;elles (une par ligne). Vide = pool par défaut.</p>
+            <textarea className={"h-32 " + inputCls} placeholder={"10 pompes bonus\n15 min de lecture en plus\nRanger un tiroir"} value={gatePoolText} onChange={(e) => setGatePoolText(e.target.value)} />
           </SystemPanel>
 
           <SystemPanel title="[ Sons & animations ]">

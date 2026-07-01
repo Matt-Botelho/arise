@@ -8,6 +8,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const h = await prisma.hunter.findFirst();
   if (!h) return NextResponse.json({ error: "Aucun chasseur" }, { status: 404 });
+  let gatePool: string[] = [];
+  try { gatePool = h.gatePoolJson ? JSON.parse(h.gatePoolJson) : []; } catch {}
   return NextResponse.json({
     name: h.name,
     penaltyIntensity: h.penaltyIntensity,
@@ -15,6 +17,7 @@ export async function GET() {
     timezone: h.timezone,
     dayTheme: h.dayThemeJson ? JSON.parse(h.dayThemeJson) : DEFAULT_DAY_THEME,
     sfxEnabled: h.sfxEnabled,
+    gatePool,
   });
 }
 
@@ -28,6 +31,7 @@ export async function POST(req: Request) {
   if (typeof body.dayRolloverHour === "number" && Number.isInteger(body.dayRolloverHour) && body.dayRolloverHour >= 0 && body.dayRolloverHour <= 23) data.dayRolloverHour = body.dayRolloverHour;
   if (typeof body.timezone === "string" && body.timezone.trim()) data.timezone = body.timezone.trim();
   if (typeof body.sfxEnabled === "boolean") data.sfxEnabled = body.sfxEnabled;
+  if (Array.isArray(body.gatePool)) data.gatePoolJson = JSON.stringify((body.gatePool as unknown[]).filter((x) => typeof x === "string" && (x as string).trim()).map((x) => (x as string).trim()).slice(0, 30));
   if (body.dayTheme && typeof body.dayTheme === "object") {
     const codes = new Set(ATTRIBUTES.map((a) => a.code));
     const clean: Record<string, string> = {};

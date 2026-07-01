@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   const b = (await req.json().catch(() => ({}))) as {
     attributeCode?: string; horizon?: string; title?: string; description?: string; targetCount?: number;
     kind?: string; metricUnit?: string; startValue?: number; targetValue?: number;
-    parentId?: string | null; baseXp?: number; recurrence?: string; steps?: string[];
+    parentId?: string | null; baseXp?: number; recurrence?: string; steps?: string[]; metricKey?: string;
   };
   if (!b.attributeCode || !b.title || !b.title.trim()) return NextResponse.json({ error: "Domaine et titre requis" }, { status: 400 });
   const horizon = ["long", "moyen", "court"].includes(b.horizon || "") ? (b.horizon as string) : "court";
@@ -74,18 +74,21 @@ export async function POST(req: Request) {
     data.startValue = typeof b.startValue === "number" ? b.startValue : 0;
     data.targetValue = typeof b.targetValue === "number" ? b.targetValue : 0;
     data.currentValue = data.startValue;
+    // Métrique liée à Apple Santé : currentValue suivra la balance/l'app automatiquement.
+    if (typeof b.metricKey === "string" && b.metricKey.trim()) data.metricKey = b.metricKey.trim();
   }
   const objective = await prisma.objective.create({ data: data as never });
   return NextResponse.json({ ok: true, objective });
 }
 
 export async function PATCH(req: Request) {
-  const b = (await req.json().catch(() => ({}))) as { id?: string; status?: string; targetCount?: number; currentValue?: number };
+  const b = (await req.json().catch(() => ({}))) as { id?: string; status?: string; targetCount?: number; currentValue?: number; metricKey?: string | null };
   if (!b.id) return NextResponse.json({ error: "id requis" }, { status: 400 });
-  const data: { status?: string; targetCount?: number; currentValue?: number } = {};
+  const data: { status?: string; targetCount?: number; currentValue?: number; metricKey?: string | null } = {};
   if (typeof b.status === "string") data.status = b.status === "done" ? "done" : "active";
   if (Number.isInteger(b.targetCount) && (b.targetCount as number) > 0) data.targetCount = b.targetCount as number;
   if (typeof b.currentValue === "number") data.currentValue = b.currentValue;
+  if (b.metricKey === null || typeof b.metricKey === "string") data.metricKey = b.metricKey === null ? null : (b.metricKey.trim() || null);
   if (Object.keys(data).length) await prisma.objective.update({ where: { id: b.id }, data }).catch(() => {});
   return NextResponse.json({ ok: true });
 }

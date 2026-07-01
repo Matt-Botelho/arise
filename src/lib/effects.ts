@@ -15,7 +15,8 @@ export function itemEffect(slot: string): "xp" | "gold" | "loot" {
   return SLOT_EFFECT[slot] ?? "xp";
 }
 
-export function computeBonuses(equipped: Equipped, plusByKey: Record<string, number> = {}): Bonuses {
+// exoByKey : bonus "exo" de la Forge des Ombres par clé d'item ({xpPct, goldPct, lootPct}).
+export function computeBonuses(equipped: Equipped, plusByKey: Record<string, number> = {}, exoByKey: Record<string, { xpPct: number; goldPct: number; lootPct: number }> = {}): Bonuses {
   let xp = 0, gold = 0, loot = 0;
   for (const slot of EQUIP_SLOTS) {
     const sel = equipped[slot];
@@ -25,6 +26,8 @@ export function computeBonuses(equipped: Equipped, plusByKey: Record<string, num
     const mag = itemMagnitude(it.rarity, plusByKey[sel.key] ?? 0);
     const eff = itemEffect(slot);
     if (eff === "xp") xp += mag; else if (eff === "gold") gold += mag; else loot += mag;
+    const exo = exoByKey[sel.key];
+    if (exo) { xp += exo.xpPct || 0; gold += exo.goldPct || 0; loot += exo.lootPct || 0; }
   }
   return { xpPct: xp, goldPct: gold, lootPct: loot };
 }

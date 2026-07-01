@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import SystemPanel from "@/components/SystemPanel";
 import LpcItemThumb from "@/components/LpcItemThumb";
 import { TIER_LABEL, TIER_COLOR, type Tier } from "@/lib/achievements";
+import { GRADE_COLOR, type WeekGrade } from "@/lib/weekscore";
 import { playLevelUp, setSfxEnabled } from "@/lib/sfx";
 
 type Pt = { day: string; xp: number; done: number; failed: number };
@@ -11,6 +12,7 @@ type Attr = { code: string; name: string; color: string; level: number };
 type Reward = { gold: number; shards: number; skin?: string };
 type Ach = { key: string; name: string; description: string; icon: string; tier: string; reward: Reward; unlocked: boolean };
 type TitleOpt = { key: string; name: string; icon: string };
+type WeekRow = { weekKey: string; score: number; grade: string };
 
 const TIERS: Tier[] = ["bronze", "argent", "or", "legendaire"];
 
@@ -22,12 +24,16 @@ export default function StatsPage() {
   const [activeTitle, setActiveTitle] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [weeks, setWeeks] = useState<WeekRow[]>([]);
+  const [bestWeek, setBestWeek] = useState(0);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/history").then((r) => r.json()),
       fetch("/api/achievements").then((r) => r.json()),
-    ]).then(([h, a]) => {
+      fetch("/api/weekscore").then((r) => r.json()).catch(() => null),
+    ]).then(([h, a, w]) => {
+      if (w && !w.error) { setWeeks(w.scores || []); setBestWeek(w.best || 0); }
       setSeries(h.series || []);
       setAttrs(h.attributes || []);
       setAchs(a.achievements || []);
@@ -82,6 +88,24 @@ export default function StatsPage() {
           })}
         </svg>
         <p className="mt-2 text-xs text-system-text/60">{totalDone} quêtes complétées · {totalXp} XP sur 30 jours</p>
+      </SystemPanel>
+
+      <SystemPanel title="[ Notes de semaine ]">
+        <p className="mb-2 text-xs text-system-text/40">Ta semaine est notée S/A/B/C au lundi matin (validations + jours parfaits − échecs). Bats ton record : +150 or, +3 ✦.</p>
+        {weeks.length === 0 ? <p className="text-sm text-system-text/60">Première note lundi prochain. Le Système compile…</p> : (
+          <ul className="space-y-1.5">
+            {weeks.map((w) => (
+              <li key={w.weekKey} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-system-text/70">Semaine du {w.weekKey}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-xs text-system-text/50">{w.score} pts{w.score >= bestWeek && bestWeek > 0 ? " 🏅" : ""}</span>
+                  <span className="w-7 rounded border px-1.5 py-0.5 text-center font-black" style={{ borderColor: GRADE_COLOR[w.grade as WeekGrade] || "#5f7285", color: GRADE_COLOR[w.grade as WeekGrade] || "#5f7285" }}>{w.grade}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {bestWeek > 0 && <p className="mt-2 text-xs text-system-text/60">Record personnel : <span className="text-amber-300">{bestWeek} pts</span></p>}
       </SystemPanel>
 
       <SystemPanel title="[ Niveaux d'attributs ]">
