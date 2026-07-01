@@ -5,7 +5,7 @@ import { ATTRIBUTES } from "@/lib/game.config";
 import { SUGGESTIONS } from "@/lib/suggestions";
 
 type Q = { id: string; title: string; baseXp: number; difficulty: string };
-type Obj = { id: string; attributeCode: string; horizon: string; title: string; status: string; quests: Q[] };
+type Obj = { id: string; attributeCode: string; horizon: string; title: string; status: string; progress: number; targetCount: number; quests: Q[] };
 
 const NAME: Record<string, string> = Object.fromEntries(ATTRIBUTES.map((a) => [a.code, a.icon + " " + a.name]));
 
@@ -15,6 +15,7 @@ export default function ObjectifsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [code, setCode] = useState(ATTRIBUTES[0].code);
   const [horizon, setHorizon] = useState("court");
+  const [target, setTargetVal] = useState(10);
   const [title, setTitle] = useState("");
   const [openAdd, setOpenAdd] = useState<string | null>(null);
   const [customQ, setCustomQ] = useState("");
@@ -28,11 +29,12 @@ export default function ObjectifsPage() {
 
   async function createObj() {
     if (!title.trim()) return;
-    const r = await fetch("/api/objectives", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ attributeCode: code, horizon, title }) }).then((res) => res.json());
-    if (r.ok) { setTitle(""); load(); } else flash(r.error || "Erreur");
+    const r = await fetch("/api/objectives", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ attributeCode: code, horizon, title, targetCount: target }) }).then((res) => res.json());
+    if (r.ok) { setTitle(""); setTargetVal(10); load(); } else flash(r.error || "Erreur");
   }
   async function delObj(id: string) { await fetch("/api/objectives", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); load(); }
   async function toggleDone(o: Obj) { await fetch("/api/objectives", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, status: o.status === "done" ? "active" : "done" }) }); load(); }
+  async function setTarget(o: Obj, n: number) { if (n < 1) return; await fetch("/api/objectives", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, targetCount: n }) }); load(); }
   async function addQuest(o: Obj, t: { title: string; baseXp?: number; difficulty?: string }) {
     await fetch("/api/quests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: t.title, attributeCodes: [o.attributeCode], baseXp: t.baseXp || 50, difficulty: t.difficulty || "E", objectiveId: o.id }) });
     setCustomQ(""); load();
@@ -60,6 +62,7 @@ export default function ObjectifsPage() {
             <option value="court">Court terme</option>
             <option value="moyen">Moyen terme</option>
           </select>
+          <label className="flex items-center gap-1 text-xs text-system-text/60">Cible <input type="number" min={1} className="w-16 rounded border border-system-border/40 bg-black/40 px-2 py-2 text-sm outline-none" value={target} onChange={(e) => setTargetVal(Math.max(1, parseInt(e.target.value || "1", 10)))} /> validations</label>
         </div>
         <input className="mt-2 w-full rounded border border-system-border/40 bg-black/40 px-3 py-2 text-sm outline-none focus:border-system-accent" placeholder="Intitulé de l'objectif" value={title} onChange={(e) => setTitle(e.target.value)} />
         <button onClick={createObj} className="mt-2 w-full rounded border border-system-border px-3 py-2 text-xs uppercase tracking-widest text-system-accent hover:bg-system-accent/10">Ajouter l'objectif</button>
@@ -83,6 +86,25 @@ export default function ObjectifsPage() {
                     <button onClick={() => delObj(o.id)} className="rounded border border-red-500/40 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10">✕</button>
                   </div>
                 </div>
+                {(() => {
+                  const tgt = o.targetCount || 10;
+                  const pct = Math.min(100, Math.round((o.progress / tgt) * 100));
+                  const reached = o.progress >= tgt;
+                  return (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-[11px] text-system-text/50">
+                        <span>{reached ? "🎉 Atteint" : "Progression"} : {o.progress}/{tgt} validations</span>
+                        <span className="flex items-center gap-1">
+                          <button onClick={() => setTarget(o, tgt - 1)} className="rounded border border-system-border/40 px-1.5 leading-none hover:border-system-accent hover:text-system-accent">−</button>
+                          <button onClick={() => setTarget(o, tgt + 1)} className="rounded border border-system-border/40 px-1.5 leading-none hover:border-system-accent hover:text-system-accent">+</button>
+                        </span>
+                      </div>
+                      <div className="mt-1 h-2 w-full overflow-hidden rounded bg-black/40">
+                        <div className={"h-full " + (reached ? "bg-emerald-400" : "bg-system-accent")} style={{ width: pct + "%" }} />
+                      </div>
+                    </div>
+                  );
+                })()}
                 {o.quests.length > 0 && (
                   <ul className="mt-2 space-y-1">
                     {o.quests.map((q) => (

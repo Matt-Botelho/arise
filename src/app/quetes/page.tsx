@@ -41,6 +41,7 @@ export default function QuetesPage() {
     let msg = "+" + r.gained + " XP";
     if (r.levelUps?.length) msg += " · " + r.levelUps.map((l: LevelUp) => l.name + " Niv." + l.level + " !").join(" · ");
     if (r.drop) msg += " · ✦ Butin : " + r.drop.name + " (" + (RARITY_LABEL[r.drop.rarity as Rarity] || r.drop.rarity) + ")";
+    if (r.objective) msg += r.objective.justCompleted ? " · 🎯 Objectif accompli : " + r.objective.title + " !" : " · 🎯 " + r.objective.title + " " + r.objective.progress + "/" + r.objective.target;
     flash(msg); load();
   }
 

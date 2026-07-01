@@ -65,10 +65,22 @@ export async function POST(req: Request) {
     drop = { key: it.key, name: it.name, rarity: it.rarity };
   }
 
+  let objective: { id: string; title: string; progress: number; target: number; justCompleted: boolean } | null = null;
+  if (quest.objectiveId) {
+    const obj = await prisma.objective.findUnique({ where: { id: quest.objectiveId } });
+    if (obj) {
+      const linked = await prisma.quest.findMany({ where: { objectiveId: obj.id }, select: { id: true } });
+      const progress = await prisma.questLog.count({ where: { status: "done", questId: { in: linked.map((q) => q.id) } } });
+      const justCompleted = obj.status !== "done" && progress >= obj.targetCount;
+      if (justCompleted) await prisma.objective.update({ where: { id: obj.id }, data: { status: "done" } });
+      objective = { id: obj.id, title: obj.title, progress, target: obj.targetCount, justCompleted };
+    }
+  }
+
   return NextResponse.json({
     ok: true, gained, goldGain, exhausted,
     globalLevel: g.level, globalLeveledUp: g.leveledUp, atCeiling: g.atCeiling,
     rankUpReady: rankUpAvailable(g.level, hunter.rank),
-    levelUps, drop,
+    levelUps, drop, objective,
   });
 }

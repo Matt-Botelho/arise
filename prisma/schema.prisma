@@ -188,5 +188,6 @@ model Objective {
   title         String
   description   String   @default("")
   status        String   @default("active")
+  targetCount   Int      @default(10)
   createdAt     DateTime @default(now())
 }

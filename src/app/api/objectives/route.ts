@@ -7,11 +7,17 @@ export async function GET() {
   const hunter = await prisma.hunter.findFirst();
   if (!hunter) return NextResponse.json({ error: "Aucun chasseur" }, { status: 404 });
   const objectives = await prisma.objective.findMany({ where: { hunterId: hunter.id }, orderBy: { createdAt: "asc" } });
-  const quests = await prisma.quest.findMany({ where: { hunterId: hunter.id, active: true, objectiveId: { not: null } } });
+  const activeQuests = await prisma.quest.findMany({ where: { hunterId: hunter.id, active: true, objectiveId: { not: null } } });
+  const linkedQuests = await prisma.quest.findMany({ where: { hunterId: hunter.id, objectiveId: { not: null } }, select: { id: true, objectiveId: true } });
+  const qToObj: Record<string, string> = Object.fromEntries(linkedQuests.map((q) => [q.id, q.objectiveId as string]));
+  const logs = await prisma.questLog.findMany({ where: { hunterId: hunter.id, status: "done", questId: { in: linkedQuests.map((q) => q.id) } }, select: { questId: true } });
+  const progressByObj: Record<string, number> = {};
+  for (const l of logs) { const oid = qToObj[l.questId]; if (oid) progressByObj[oid] = (progressByObj[oid] || 0) + 1; }
   return NextResponse.json({
     objectives: objectives.map((o) => ({
       ...o,
-      quests: quests.filter((q) => q.objectiveId === o.id).map((q) => ({ id: q.id, title: q.title, baseXp: q.baseXp, difficulty: q.difficulty })),
+      progress: progressByObj[o.id] || 0,
+      quests: activeQuests.filter((q) => q.objectiveId === o.id).map((q) => ({ id: q.id, title: q.title, baseXp: q.baseXp, difficulty: q.difficulty })),
     })),
   });
 }
@@ -19,19 +25,23 @@ export async function GET() {
 export async function POST(req: Request) {
   const hunter = await prisma.hunter.findFirst();
   if (!hunter) return NextResponse.json({ error: "Aucun chasseur" }, { status: 404 });
-  const b = (await req.json().catch(() => ({}))) as { attributeCode?: string; horizon?: string; title?: string; description?: string };
+  const b = (await req.json().catch(() => ({}))) as { attributeCode?: string; horizon?: string; title?: string; description?: string; targetCount?: number };
   if (!b.attributeCode || !b.title || !b.title.trim()) return NextResponse.json({ error: "Domaine et titre requis" }, { status: 400 });
   const horizon = b.horizon === "moyen" ? "moyen" : "court";
+  const targetCount = Number.isInteger(b.targetCount) && (b.targetCount as number) > 0 ? (b.targetCount as number) : 10;
   const objective = await prisma.objective.create({
-    data: { hunterId: hunter.id, attributeCode: b.attributeCode, horizon, title: b.title.trim(), description: typeof b.description === "string" ? b.description : "" },
+    data: { hunterId: hunter.id, attributeCode: b.attributeCode, horizon, title: b.title.trim(), description: typeof b.description === "string" ? b.description : "", targetCount },
   });
   return NextResponse.json({ ok: true, objective });
 }
 
 export async function PATCH(req: Request) {
-  const b = (await req.json().catch(() => ({}))) as { id?: string; status?: string };
+  const b = (await req.json().catch(() => ({}))) as { id?: string; status?: string; targetCount?: number };
   if (!b.id) return NextResponse.json({ error: "id requis" }, { status: 400 });
-  await prisma.objective.update({ where: { id: b.id }, data: { status: b.status === "done" ? "done" : "active" } }).catch(() => {});
+  const data: { status?: string; targetCount?: number } = {};
+  if (typeof b.status === "string") data.status = b.status === "done" ? "done" : "active";
+  if (Number.isInteger(b.targetCount) && (b.targetCount as number) > 0) data.targetCount = b.targetCount as number;
+  if (Object.keys(data).length) await prisma.objective.update({ where: { id: b.id }, data }).catch(() => {});
   return NextResponse.json({ ok: true });
 }
 
